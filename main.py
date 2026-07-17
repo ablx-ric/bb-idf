@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from tf_inst.algorithms import TfidfVectorizerWrapper, TextRankVectorizer, CustomVectorizer
+from tf_inst.algorithms import TfidfVectorizerWrapper, TextRankVectorizer, TFPDC_Scalable
 from tf_inst.evaluation.benchmark import Benchmark
 from tf_inst.utils.io import load_text_files, save_results
 
@@ -18,7 +18,7 @@ def main():
     vectorizers = {
         "tfidf": TfidfVectorizerWrapper(),
         "textrank": TextRankVectorizer(),
-        "custom": CustomVectorizer(),
+        "tfpdc": TFPDC_Scalable(),
     }
 
     df = benchmark.run(documents, queries, vectorizers)

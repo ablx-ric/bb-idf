@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from tf_inst.algorithms import TfidfVectorizerWrapper, TextRankVectorizer, CustomVectorizer
+from tf_inst.algorithms import TfidfVectorizerWrapper, TextRankVectorizer, TFPDC_Scalable
 
 
 class TestTfidfVectorizerWrapper:
@@ -49,9 +49,34 @@ class TestTextRankVectorizer:
             vec.transform(["hola"])
 
 
-class TestCustomVectorizer:
-    def test_fit_transform_returns_array(self):
-        docs = ["hola mundo"]
-        vec = CustomVectorizer()
+class TestTFPDCScalable:
+    def test_fit_transform_returns_dense_array(self):
+        docs = ["hola mundo cruel", "mundo adiós"]
+        vec = TFPDC_Scalable()
         X = vec.fit_transform(docs)
         assert isinstance(X, np.ndarray)
+        assert X.shape == (2, 4)
+
+    def test_vocabulary(self):
+        docs = ["hola mundo"]
+        vec = TFPDC_Scalable()
+        vec.fit(docs)
+        assert "hola" in vec.vocabulary
+
+    def test_aof_filtering_removes_frequent_terms(self):
+        docs = ["común raro", "común", "común", "común"]
+        vec = TFPDC_Scalable(max_threshold=0.5)
+        vec.fit(docs)
+        assert "común" not in vec.vocabulary
+        assert "raro" in vec.vocabulary
+
+    def test_transform_uses_fitted_vocabulary(self):
+        vec = TFPDC_Scalable()
+        vec.fit(["hola mundo", "mundo adiós"])
+        X = vec.transform(["hola desconocido"])
+        assert X.shape == (1, len(vec.vocabulary))
+
+    def test_transform_without_fit_raises(self):
+        vec = TFPDC_Scalable()
+        with pytest.raises(ValueError):
+            vec.transform(["hola"])
