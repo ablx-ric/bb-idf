@@ -1,0 +1,30 @@
+[project]
+name = "tf-inst"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "ipykernel>=7.3.0",
+    "marimo>=0.23.13",
+    "matplotlib>=3.11.0",
+    "numpy>=2.5.0",
+    "polars>=1.42.1",
+    "pymupdf>=1.28.0",
+    "scikit-learn>=1.9.0",
+    "seaborn>=0.13.2",
+]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.package-dir]
+"" = "src"
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]

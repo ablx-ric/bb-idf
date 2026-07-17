@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+
+# Entornos
+.venv/
+
+# Herramientas
+.pytest_cache/
+__marimo__/
+.ipynb_checkpoints/
+
+# Datos y resultados generados
+data/processed/
+data/results/
