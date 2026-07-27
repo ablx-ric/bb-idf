@@ -20,6 +20,46 @@ class Evaluator:
         return hits / min(k, len(retrieved_k))
 
     @staticmethod
+    def recall_at_k(
+        relevant: list[int], retrieved: list[int], k: int = 5
+    ) -> float:
+        if not relevant or not retrieved:
+            return 0.0
+        retrieved_k = retrieved[:k]
+        hits = len(set(relevant) & set(retrieved_k))
+        return hits / len(relevant)
+
+    @staticmethod
+    def mean_reciprocal_rank(
+        query_relevant: list[list[int]],
+        query_retrieved: list[list[int]],
+    ) -> float:
+        rrs = []
+        for rel, ret in zip(query_relevant, query_retrieved):
+            for rank, doc in enumerate(ret, start=1):
+                if doc in rel:
+                    rrs.append(1.0 / rank)
+                    break
+            else:
+                rrs.append(0.0)
+        return float(np.mean(rrs))
+
+    @staticmethod
+    def ndcg_at_k(
+        relevant: list[int], retrieved: list[int], k: int = 5
+    ) -> float:
+        if not retrieved or not relevant:
+            return 0.0
+        retrieved_k = retrieved[:k]
+        dcg = 0.0
+        for i, doc in enumerate(retrieved_k, start=1):
+            if doc in relevant:
+                dcg += 1.0 / np.log2(i + 1)
+        ideal = min(len(relevant), k)
+        idcg = sum(1.0 / np.log2(i + 1) for i in range(1, ideal + 1))
+        return dcg / idcg if idcg > 0 else 0.0
+
+    @staticmethod
     def mean_average_precision(
         query_relevant: list[list[int]],
         query_retrieved: list[list[int]],

@@ -1,0 +1,370 @@
+# Evaluación integral de TF-IDF, TextRank y TFPDC
+
+Actualmente la comparación solo incluye:
+- Tamaño del vocabulario (vocab)
+- Dimensión de la matriz (shape)
+- Tiempo de construcción del modelo (fit_time)
+
+Estas métricas son útiles para evaluar el costo computacional, pero no son suficientes para una comparación científica de métodos de representación textual o recuperación de información.
+
+Se requiere ampliar la evaluación incorporando las siguientes métricas y experimentos.
+
+---
+
+## 1. Tiempo de construcción (Fit Time)
+
+Ya implementado.
+
+Objetivo:
+- Medir el tiempo necesario para construir el modelo.
+
+Reportar:
+- Media
+- Desviación estándar
+- Mínimo
+- Máximo
+
+Realizar al menos 30 ejecuciones independientes.
+
+---
+
+## 2. Tiempo de transformación (Transform Time)
+
+Medir cuánto tarda el modelo en transformar nuevos documentos o consultas.
+
+Ejemplo:
+- vectorizer.transform(query)
+
+Reportar:
+- Tiempo promedio
+- Desviación estándar
+
+---
+
+## 3. Tiempo de búsqueda (Query Time)
+
+Medir cuánto tarda responder una consulta completa.
+
+Incluye:
+- Vectorización de la consulta
+- Cálculo de similitud (Cosine Similarity)
+- Obtención del ranking
+
+Reportar:
+- Tiempo promedio por consulta
+
+---
+
+## 4. Uso de memoria
+
+Medir:
+
+- Memoria utilizada durante fit()
+- Memoria de la matriz dispersa
+- Memoria ocupada por el vocabulario
+- Memoria total del modelo
+
+Puede utilizarse:
+- psutil
+- tracemalloc
+- matrix.data.nbytes
+
+---
+
+## 5. Tamaño del modelo serializado
+
+Guardar cada modelo usando:
+
+- pickle
+- joblib
+
+Comparar el tamaño del archivo generado.
+
+Ejemplo:
+
+TF-IDF.pkl
+TextRank.pkl
+TFPDC.pkl
+
+---
+
+## 6. Sparsity (Esparsidad)
+
+Calcular:
+
+Sparsity = 1 - (nnz / (filas × columnas))
+
+donde nnz es el número de elementos distintos de cero.
+
+Esta métrica indica qué tan dispersa es la representación.
+
+---
+
+## 7. Densidad
+
+Complementaria a Sparsity.
+
+Calcular:
+
+Density = nnz / (filas × columnas)
+
+---
+
+## 8. Número promedio de términos por documento
+
+Calcular:
+
+- promedio
+- mediana
+- desviación estándar
+
+Esto permite observar si algún método genera representaciones excesivamente grandes.
+
+---
+
+## 9. Distribución de pesos
+
+Analizar la distribución de los pesos obtenidos por cada método.
+
+Generar:
+
+- Histogramas
+- Boxplots
+
+Comparar:
+
+- concentración
+- dispersión
+- presencia de valores extremos
+
+Especialmente importante para justificar matemáticamente TFPDC.
+
+---
+
+## 10. Calidad de recuperación (Information Retrieval)
+
+Construir un conjunto de consultas con relevancia conocida (ground truth).
+
+Evaluar:
+
+- Precision@k
+- Recall@k
+- MAP (Mean Average Precision)
+- MRR (Mean Reciprocal Rank)
+- nDCG
+
+Estas son las métricas más importantes del estudio.
+
+---
+
+## 11. Similitud documento-documento
+
+Seleccionar documentos de prueba.
+
+Calcular:
+
+Cosine Similarity
+
+Evaluar si los documentos recuperados como más similares realmente pertenecen al mismo tema.
+
+Puede realizarse validación manual por expertos.
+
+---
+
+## 12. Robustez frente al ruido
+
+Evaluar consultas modificadas.
+
+Ejemplos:
+
+machine learning
+
+machin learning
+
+machine learnng
+
+learning machine
+
+Comparar cómo cambia el ranking.
+
+---
+
+## 13. Escalabilidad
+
+Repetir los experimentos utilizando distintos tamaños del corpus.
+
+Ejemplo:
+
+34 documentos
+100 documentos
+500 documentos
+1000 documentos
+5000 documentos
+10000 documentos
+
+Graficar:
+
+- Tiempo vs número de documentos
+- Memoria vs número de documentos
+- Tiempo de consulta vs número de documentos
+
+---
+
+## 14. Complejidad computacional
+
+Realizar análisis teórico.
+
+Derivar la complejidad temporal y espacial de:
+
+- TF-IDF
+- TextRank
+- TFPDC
+
+Explicar cada una mediante notación Big-O.
+
+---
+
+## 15. Estabilidad
+
+Ejecutar cada experimento múltiples veces (idealmente 30).
+
+Reportar:
+
+- Media
+- Desviación estándar
+- Intervalos de confianza
+
+Evitar reportar una sola ejecución.
+
+---
+
+## 16. Visualizaciones
+
+Generar gráficos comparativos:
+
+- Barras de tiempos
+- Barras de memoria
+- Boxplots
+- Histogramas
+- Curvas de escalabilidad
+- Sparsity
+- Density
+
+---
+
+## 17. Igualdad de condiciones experimentales
+
+Verificar que todos los métodos utilicen exactamente el mismo preprocesamiento.
+
+Debe mantenerse constante:
+
+- Tokenización
+- Stopwords
+- Normalización
+- Lemmatización o stemming
+- N-gramas
+- Longitud mínima
+- Vocabulario base (cuando corresponda)
+
+Actualmente TextRank genera un vocabulario diferente (24636 términos frente a 21330), por lo que debe justificarse metodológicamente o igualarse el espacio de términos para realizar una comparación justa.
+
+---
+
+## 18. Diseño experimental
+
+Documentar completamente:
+
+- Hardware utilizado
+- CPU
+- RAM
+- Sistema operativo
+- Versión de Python
+- Librerías
+- Número de documentos
+- Número total de términos
+- Longitud promedio de documentos
+
+Esto mejora la reproducibilidad.
+
+---
+
+## 19. Análisis estadístico
+
+Comparar los métodos mediante pruebas estadísticas.
+
+Si existen múltiples ejecuciones:
+
+- Shapiro-Wilk (normalidad)
+- ANOVA o Kruskal-Wallis
+- t-test o Mann-Whitney
+- Tamaño del efecto (Cohen's d)
+
+Demostrar que las diferencias observadas son estadísticamente significativas.
+
+---
+
+## 20. Tablas finales sugeridas
+
+Tabla 1. Características del modelo
+
+- Vocabulario
+- Shape
+- Sparsity
+- Density
+- Memoria
+- Tamaño serializado
+
+Tabla 2. Rendimiento computacional
+
+- Fit Time
+- Transform Time
+- Query Time
+
+(media ± desviación estándar)
+
+Tabla 3. Calidad de recuperación
+
+- Precision@5
+- Precision@10
+- Recall@5
+- Recall@10
+- MAP
+- MRR
+- nDCG
+
+Tabla 4. Escalabilidad
+
+Para diferentes tamaños del corpus:
+
+- Fit Time
+- Query Time
+- Memoria
+
+---
+
+## Prioridad de implementación
+
+### Esenciales (imprescindibles para una publicación)
+
+1. Fit Time (media ± desviación estándar)
+2. Transform Time
+3. Query Time
+4. Uso de memoria
+5. Sparsity
+6. Precision@k
+7. Recall@k
+8. MAP
+9. MRR o nDCG
+10. Escalabilidad
+
+### Muy recomendables
+
+11. Tamaño del modelo serializado
+12. Distribución de pesos
+13. Robustez frente al ruido
+14. Similitud documento-documento
+15. Complejidad teórica
+16. Análisis estadístico
+17. Visualizaciones comparativas
+
+Objetivo final: obtener una evaluación completa que compare TF-IDF, TextRank y TFPDC tanto desde el punto de vista computacional (eficiencia, memoria, escalabilidad) como desde el punto de vista de recuperación de información (calidad, precisión y robustez), cumpliendo estándares de una investigación científica.
