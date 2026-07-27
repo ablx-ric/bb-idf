@@ -16,3 +16,5 @@ __marimo__/
 # Datos y resultados generados
 data/processed/
 data/results/
+data/corpus/*.pdf
+output/

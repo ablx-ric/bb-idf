@@ -1,41 +1,30 @@
 import numpy as np
+from scipy import sparse
 from sklearn.feature_extraction.text import CountVectorizer
 
 
 class TFPDC_Scalable:
-    """Propuesta (tf-inst): TF-IDF con filtrado de términos por AOF.
-
-    AOF (Average Occurrence Frequency) filtra los términos cuyo promedio de
-    ocurrencia en la colección queda fuera de [min_threshold, max_threshold]
-    antes de ponderar con TF*IDF. Calcula además FTD, FTC y PDC.
-
-    min_threshold: Límite inferior para el AOF.
-    max_threshold: Límite superior para el AOF.
-    normalize_aof: Si es True, divide las frecuencias de cada documento por su
-                   longitud total antes de calcular el AOF (queda entre 0 y 1).
-    stop_words: Se pasa a CountVectorizer (p.ej. 'english' o lista propia).
-                Por defecto None porque el Preprocessor ya limpia el texto.
-
-    Implementa la misma interfaz que TfidfVectorizerWrapper para ser
-    intercambiable en el benchmark.
-    """
-
     def __init__(
         self,
         min_threshold: float = 0.0,
         max_threshold: float = 100.0,
         normalize_aof: bool = False,
+        use_pdc: bool = True,
         stop_words=None,
     ):
         self.min_threshold = min_threshold
         self.max_threshold = max_threshold
         self.normalize_aof = normalize_aof
+        self.use_pdc = use_pdc
         self.vectorizer = CountVectorizer(stop_words=stop_words)
         self._vocabulary = None
         self._valid_mask = None
         self._idf = None
+        self._inv_FTC = None
         self.AOF = None
-        self.PDC = None
+        self.PDC_doc = None
+        self.FTD = None
+        self.FTC = None
 
     def fit(self, documents: list[str]):
         X_sparse = self.vectorizer.fit_transform(documents)
@@ -49,20 +38,24 @@ class TFPDC_Scalable:
             term_freq_sum = np.asarray(X_normalized.sum(axis=0)).flatten()
         else:
             term_freq_sum = np.asarray(X_sparse.sum(axis=0)).flatten()
-
         self.AOF = term_freq_sum / n_docs
+
         self._valid_mask = (self.AOF >= self.min_threshold) & (
             self.AOF <= self.max_threshold
         )
-
-        X_filtered = X_sparse[:, self._valid_mask]
+        X_filtered = X_sparse[:, self._valid_mask].tocsr()
         terms = feature_names[self._valid_mask]
         self._vocabulary = {term: idx for idx, term in enumerate(terms)}
+
+        if X_filtered.shape[1] == 0:
+            raise ValueError("El filtro AOF eliminó todos los términos. Revisa min_threshold/max_threshold y normalize_aof.")
 
         FTD = np.asarray(X_filtered.sum(axis=1)).flatten()
         FTC = np.asarray(X_filtered.sum(axis=0)).flatten()
         total_collection_terms = FTC.sum()
-        self.PDC = (
+        self.FTD = FTD
+        self.FTC = FTC
+        self.PDC_doc = (
             FTD / total_collection_terms
             if total_collection_terms > 0
             else np.zeros_like(FTD, dtype=float)
@@ -70,17 +63,40 @@ class TFPDC_Scalable:
 
         doc_freq = np.asarray((X_filtered > 0).sum(axis=0)).flatten()
         self._idf = np.log(n_docs / (doc_freq + 1e-8))
+
+        inv_FTC = np.zeros_like(FTC, dtype=float)
+        nonzero = FTC > 0
+        inv_FTC[nonzero] = 1.0 / FTC[nonzero]
+        self._inv_FTC = inv_FTC
+
         return self
 
     def transform(self, documents: list[str]) -> np.ndarray:
         if self._idf is None:
             raise ValueError("El vectorizador no ha sido ajustado. Llama a fit() primero.")
-        X = self.vectorizer.transform(documents)[:, self._valid_mask]
-        return np.asarray(X.multiply(self._idf).toarray())
+        X = self.vectorizer.transform(documents)[:, self._valid_mask].tocsr()
+
+        if not self.use_pdc:
+            return np.asarray(X.multiply(self._idf).toarray())
+
+        pdc_term_doc = X.multiply(self._inv_FTC).tocsr()
+        idf_broadcast = sparse.csr_matrix(self._idf.reshape(1, -1))
+        score = pdc_term_doc.multiply(idf_broadcast)
+        return np.asarray(score.toarray())
 
     def fit_transform(self, documents: list[str]) -> np.ndarray:
         self.fit(documents)
         return self.transform(documents)
+
+    def top_keywords(self, documents: list[str], top_n: int = 10) -> list[list[tuple]]:
+        matriz = self.transform(documents)
+        resultados = []
+        for fila in matriz:
+            top_idx = fila.argsort()[::-1][:top_n]
+            resultados.append(
+                [(self.feature_names[i], round(float(fila[i]), 4)) for i in top_idx if fila[i] > 0]
+            )
+        return resultados
 
     @property
     def vocabulary(self) -> dict:
