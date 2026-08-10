@@ -3,19 +3,18 @@ ANALISIS ESTADISTICO
 ============================================================
 
 Normalidad (Shapiro-Wilk):
-  bbidf: W=0.972, p=0.886 -> Normal
-  textrank: W=0.894, p=0.377 -> Normal
-  tfidf: W=0.979, p=0.929 -> Normal
-  Todos normales: Si
+  bbidf: W=0.655, p=0.003 -> No normal
+  textrank: W=0.984, p=0.957 -> Normal
+  tfidf: W=0.904, p=0.431 -> Normal
+  Todos normales: No
 
-Prueba: ANOVA
-  Estadistico: 2603.8919
-  p-valor: 0.0
+Prueba: Kruskal-Wallis
+  Estadistico: 12.5
+  p-valor: 0.0019
   Significativo (p<0.05): Si
-  Tamano del efecto (np2): 0.9977
 
 Comparaciones post-hoc (Mann-Whitney + Cohen's d):
-  bbidf vs textrank: U=0, p=0.0079, d=-29.993
-  bbidf vs tfidf: U=25, p=0.0079, d=20.077
-  textrank vs tfidf: U=25, p=0.0079, d=34.91
+  bbidf vs textrank: U=0, p=0.0079, d=-22.437
+  bbidf vs tfidf: U=25, p=0.0079, d=5.23
+  textrank vs tfidf: U=25, p=0.0079, d=36.394
 ============================================================

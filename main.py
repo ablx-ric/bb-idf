@@ -97,6 +97,20 @@ def main():
 
         if args.graphs and last_benchmark is not None:
             plot_all(last_benchmark.result.metrics, output_dir)
+
+        for res in last_benchmark.result.metrics:
+            kw_path = output_dir / "metrics" / f"{res.name}_keywords.csv"
+            kw_path.parent.mkdir(parents=True, exist_ok=True)
+            kw_rows = []
+            for doc_id, kw_list in enumerate(res.keywords):
+                for rank, (term, score) in enumerate(kw_list, 1):
+                    kw_rows.append({
+                        "doc_id": doc_id + 1,
+                        "rank": rank,
+                        "term": term,
+                        "score": score,
+                    })
+            pl.DataFrame(kw_rows).write_csv(kw_path)
     else:
         benchmark = Benchmark()
         vectorizers = _build_vectorizers()
