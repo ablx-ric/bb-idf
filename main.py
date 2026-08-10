@@ -4,10 +4,10 @@ from pathlib import Path
 import polars as pl
 from tqdm import tqdm
 
-from tf_inst.algorithms import TfidfVectorizerWrapper, TextRankVectorizer, BBIDF
-from tf_inst.evaluation.benchmark import Benchmark
-from tf_inst.utils.io import load_text_files, save_results
-from tf_inst.reporting import plot_all, compare_algorithms, format_report
+from bb_idf.algorithms import TfidfVectorizerWrapper, TextRankVectorizer, BBIDF
+from bb_idf.evaluation.benchmark import Benchmark
+from bb_idf.utils.io import load_text_files, save_results
+from bb_idf.reporting import plot_all, compare_algorithms, format_report
 
 
 def _build_vectorizers():
@@ -19,7 +19,7 @@ def _build_vectorizers():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="tf-inst: comparacion de algoritmos de ponderacion de terminos")
+    parser = argparse.ArgumentParser(description="bb-idf: comparacion de algoritmos de ponderacion de terminos")
     parser.add_argument("--graphs", action="store_true", help="Generar graficos de los resultados")
     parser.add_argument("--runs", type=int, default=1, help="Numero de ejecuciones para calcular media +/- std (defecto: 1)")
     parser.add_argument("--scalability", action="store_true", help="Ejecutar prueba de escalabilidad con subconjuntos del corpus")

@@ -5,8 +5,8 @@ from dataclasses import dataclass
 import numpy as np
 import polars as pl
 
-from tf_inst.preprocessing import Preprocessor
-from tf_inst.evaluation.metrics import Evaluator
+from bb_idf.preprocessing import Preprocessor
+from bb_idf.evaluation.metrics import Evaluator
 
 
 @dataclass

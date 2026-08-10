@@ -1,6 +1,6 @@
 import pytest
 import numpy as np
-from tf_inst.algorithms import TfidfVectorizerWrapper, TextRankVectorizer, BBIDF
+from bb_idf.algorithms import TfidfVectorizerWrapper, TextRankVectorizer, BBIDF
 
 
 class TestTfidfVectorizerWrapper:

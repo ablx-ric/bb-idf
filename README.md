@@ -1,4 +1,4 @@
-# tf-inst
+# bb-idf
 
 Comparacion de algoritmos de ponderacion de terminos (TF-IDF, TextRank, BB-IDF) para recuperacion de informacion en espanol.
 

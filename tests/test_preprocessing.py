@@ -1,4 +1,4 @@
-from tf_inst.preprocessing import Preprocessor
+from bb_idf.preprocessing import Preprocessor
 
 
 class TestPreprocessor:

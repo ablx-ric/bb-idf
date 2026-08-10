@@ -5,7 +5,7 @@ import matplotlib as mpl
 import numpy as np
 import seaborn as sns
 
-from tf_inst.evaluation.benchmark import AlgoMetrics
+from bb_idf.evaluation.benchmark import AlgoMetrics
 
 OKABE_ITO = ['#E69F00', '#56B4E9', '#009E73', '#F0E442',
              '#0072B2', '#D55E00', '#CC79A7', '#000000']
