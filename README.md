@@ -1,6 +1,6 @@
 # tf-inst
 
-Comparacion de algoritmos de ponderacion de terminos (TF-IDF, TextRank, TF-PDC) para recuperacion de informacion en espanol.
+Comparacion de algoritmos de ponderacion de terminos (TF-IDF, TextRank, BB-IDF) para recuperacion de informacion en espanol.
 
 ## Instalacion
 
@@ -44,7 +44,7 @@ output/
     ├── statistical_analysis.txt    # ANOVA + post-hoc
     ├── tfidf_metrics.csv           # Matriz de similitud
     ├── textrank_metrics.csv
-    └── tfpdc_metrics.csv
+    └── bbidf_metrics.csv
 ```
 
 ## Algoritmos
@@ -61,15 +61,29 @@ Implementacion propia basada en Mihalcea & Tarau (2004). Construye un grafo de c
 
 $$S(v_i) = (1-d) + d \cdot \sum_{v_j \in In(v_i)} \frac{w_{ji}}{\sum_{v_k \in Out(v_j)} w_{jk}} S(v_j)$$
 
-### TF-PDC (Propuesta)
+### BB-IDF (Propuesta)
 
-Implementacion propia con tres componentes:
+**Bounded Band Inverse Document Frequency** — evolucion del TF-IDF que introduce un **filtro de banda estadistico adaptativo por documento**. En lugar de contar un documento para el DF con una sola mencion del termino, BB-IDF exige que la frecuencia del termino caiga dentro de una banda estadistica especifica de ese documento.
 
-- **TF-IDF base**: Misma ponderacion que sklearn
-- **Filtro AOF**: Excluye terminos cuya frecuencia absoluta supera un umbral (`max_threshold=0.5`)
-- **PDC term-document**: Ponderacion adicional $PDC_{t,d} = f_{t,d} / FTC_t$, donde $FTC_t$ es la frecuencia total del termino en el corpus
+#### Componentes
 
-$$w_{t,d} = tf_{t,d} \cdot idf_t \cdot \frac{f_{t,d}}{FTC_t}$$
+- **Banda inferior** ($\mu_d + 0.5\sigma_d$): Filtra **ruido** — terminos que aparecen muy pocas veces en el documento. Una mencion aislada no implica que el documento trate sobre ese tema.
+- **Banda superior** ($\mu_d + 2.5\sigma_d$): Filtra **spam** (keyword stuffing) y stop words — terminos que aparecen excesivamente (ej. "el", "de" en documentos grandes).
+- **Fallback para docs cortos** (< 30 tokens): Banda fija $[1.5, 4.5]$ para documentos pequenos donde la distribucion estadistica no es confiable.
+
+#### Formulas
+
+Para cada documento $d$ con frecuencias $f_{t,d}$ y $\mu_d, \sigma_d$ calculados sobre los terminos presentes en $d$:
+
+$$banda_d = [\mu_d + 0.5\sigma_d,\; \mu_d + 2.5\sigma_d]$$
+
+El conteo de documentos filtrado por banda:
+
+$$df_{banda}(t) = |\{ d : f_{t,d} \in banda_d \}|$$
+
+$$BB\text{-}IDF(t) = \log\left(1 + \frac{N}{df_{banda}(t) + 1}\right)$$
+
+$$w_{t,d} = f_{t,d} \cdot BB\text{-}IDF(t)$$
 
 ## Metodologia de Benchmark
 
@@ -154,30 +168,30 @@ Inversa del rango del primer relevante. Con relevante en posicion 1, $MRR = 1.0$
 | Algoritmo | Media (s) | Std (s) | Min (s) | Max (s) |
 |-----------|-----------|---------|---------|---------|
 | TF-IDF | 0.3237 | 0.0143 | 0.31 | 0.34 |
-| TF-PDC | 0.6279 | 0.0224 | 0.60 | 0.66 |
+| BB-IDF | 0.6279 | 0.0224 | 0.60 | 0.66 |
 | TextRank | 7.2732 | 0.1036 | 7.16 | 7.40 |
 
-TextRank es ~22x mas lento que TF-IDF y ~12x mas lento que TF-PDC.
+TextRank es ~22x mas lento que TF-IDF y ~12x mas lento que BB-IDF.
 
 ### Tiempo de transformacion
 
 | Algoritmo | Media (s) | Std (s) |
 |-----------|-----------|---------|
 | TF-IDF | 0.0392 | 0.0042 |
-| TF-PDC | 0.0384 | 0.0026 |
+| BB-IDF | 0.0384 | 0.0026 |
 | TextRank | 1.1587 | 0.0330 |
 
-TextRank es ~30x mas lento en inferencia que TF-IDF y TF-PDC.
+TextRank es ~30x mas lento en inferencia que TF-IDF y BB-IDF.
 
 ### Sparsity y Memoria
 
 | Algoritmo | Vocab | Sparsity | Memoria (KB) |
 |-----------|-------|----------|--------------|
 | TF-IDF | 21,330 | 0.9092 | 5,665.78 |
-| TF-PDC | 21,330 | 0.9092 | 5,665.78 |
+| BB-IDF | 21,330 | 0.9092 | 5,665.78 |
 | TextRank | 24,636 | 0.9181 | 6,543.94 |
 
-TextRank produce un vocabulario ~15% mayor (incluye terminos con puntuacion TextRank > 0). TF-IDF y TF-PDC comparten el mismo vocabulario (TF-PDC aplica filtro AOF sobre el conteo de sklearn, que no reduce el vocabulario en este corpus).
+TextRank produce un vocabulario ~15% mayor (incluye terminos con puntuacion TextRank > 0). TF-IDF y BB-IDF comparten el mismo vocabulario y matriz (CountVectorizer base).
 
 ### Metricas de recuperacion
 
@@ -185,20 +199,20 @@ TextRank produce un vocabulario ~15% mayor (incluye terminos con puntuacion Text
 |-----------|-----|-----|--------|-----|-----|
 | TF-IDF | 0.200 | 1.000 | 1.000 | 1.000 | 1.000 |
 | TextRank | 0.200 | 1.000 | 1.000 | 1.000 | 1.000 |
-| TF-PDC | 0.200 | 1.000 | 1.000 | 1.000 | 1.000 |
+| BB-IDF | 0.200 | 1.000 | 1.000 | 1.000 | 1.000 |
 
 Identicos. Ver seccion de metricas identicas.
 
 ### Escalabilidad
 
-| n_docs | TF-IDF (s) | TextRank (s) | TF-PDC (s) |
+| n_docs | TF-IDF (s) | TextRank (s) | BB-IDF (s) |
 |--------|------------|--------------|------------|
 | 5 | 0.0741 | 1.1742 | 0.1683 |
 | 10 | 0.1525 | 1.7430 | 0.3025 |
 | 20 | 0.3092 | 3.9089 | 0.4983 |
 | 34 | 0.5167 | 7.9811 | 0.8218 |
 
-TF-IDF y TF-PDC escalan linealmente con el numero de documentos. TextRank tiene crecimiento super-lineal (componente $O(n^2)$ en construccion de grafo de co-ocurrencia).
+TF-IDF y BB-IDF escalan linealmente con el numero de documentos. TextRank tiene crecimiento super-lineal (componente $O(n^2)$ en construccion de grafo de co-ocurrencia).
 
 ### Analisis estadistico
 
@@ -206,8 +220,8 @@ TF-IDF y TF-PDC escalan linealmente con el numero de documentos. TextRank tiene 
 - **ANOVA**: $F = 20222.85$, $p < 0.001$, $\eta_p^2 = 0.9997$ (diferencias altamente significativas)
 - **Post-hoc (Mann-Whitney + Cohen's d)**:
   - TF-IDF vs TextRank: $U=25$, $p=0.008$, $d=93.96$
-  - TF-PDC vs TextRank: $U=25$, $p=0.008$, $d=88.66$
-  - TF-IDF vs TF-PDC: $U=0$, $p=0.008$, $d=-16.19$
+  - BB-IDF vs TextRank: $U=25$, $p=0.008$, $d=88.66$
+  - TF-IDF vs BB-IDF: $U=0$, $p=0.008$, $d=-16.19$
 
 Todas las diferencias son significativas. El tamano del efecto (Cohen's d) es extremadamente grande ($|d| > 16$) en todos los pares, indicando que los algoritmos tienen rendimientos fundamentalmente distintos en tiempo de ejecucion.
 

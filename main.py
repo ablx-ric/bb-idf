@@ -4,7 +4,7 @@ from pathlib import Path
 import polars as pl
 from tqdm import tqdm
 
-from tf_inst.algorithms import TfidfVectorizerWrapper, TextRankVectorizer, TFPDC_Scalable
+from tf_inst.algorithms import TfidfVectorizerWrapper, TextRankVectorizer, BBIDF
 from tf_inst.evaluation.benchmark import Benchmark
 from tf_inst.utils.io import load_text_files, save_results
 from tf_inst.reporting import plot_all, compare_algorithms, format_report
@@ -14,7 +14,7 @@ def _build_vectorizers():
     return {
         "tfidf": TfidfVectorizerWrapper(),
         "textrank": TextRankVectorizer(),
-        "tfpdc": TFPDC_Scalable(),
+        "bbidf": BBIDF(),
     }
 
 

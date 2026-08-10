@@ -1,87 +1,62 @@
+import math
+
 import numpy as np
 from scipy import sparse
 from sklearn.feature_extraction.text import CountVectorizer
 
 
-class TFPDC_Scalable:
-    def __init__(
-        self,
-        min_threshold: float = 0.0,
-        max_threshold: float = 100.0,
-        normalize_aof: bool = False,
-        use_pdc: bool = True,
-        stop_words=None,
-    ):
-        self.min_threshold = min_threshold
-        self.max_threshold = max_threshold
-        self.normalize_aof = normalize_aof
-        self.use_pdc = use_pdc
+class BBIDF:
+    def __init__(self, stop_words=None):
         self.vectorizer = CountVectorizer(stop_words=stop_words)
         self._vocabulary = None
-        self._valid_mask = None
         self._idf = None
-        self._inv_FTC = None
-        self.AOF = None
-        self.PDC_doc = None
-        self.FTD = None
-        self.FTC = None
+        self._df_banda = None
 
     def fit(self, documents: list[str]):
         X_sparse = self.vectorizer.fit_transform(documents)
         feature_names = self.vectorizer.get_feature_names_out()
         n_docs = X_sparse.shape[0]
+        n_terms = X_sparse.shape[1]
 
-        if self.normalize_aof:
-            doc_lengths = np.asarray(X_sparse.sum(axis=1)).flatten()
-            doc_lengths[doc_lengths == 0] = 1
-            X_normalized = X_sparse.multiply(1 / doc_lengths[:, np.newaxis])
-            term_freq_sum = np.asarray(X_normalized.sum(axis=0)).flatten()
-        else:
-            term_freq_sum = np.asarray(X_sparse.sum(axis=0)).flatten()
-        self.AOF = term_freq_sum / n_docs
+        X_dense = X_sparse.toarray()
+        token_counts = np.asarray(X_dense.sum(axis=1)).flatten()
 
-        self._valid_mask = (self.AOF >= self.min_threshold) & (
-            self.AOF <= self.max_threshold
-        )
-        X_filtered = X_sparse[:, self._valid_mask].tocsr()
-        terms = feature_names[self._valid_mask]
-        self._vocabulary = {term: idx for idx, term in enumerate(terms)}
+        band_inf = np.zeros(n_docs)
+        band_sup = np.zeros(n_docs)
+        for d in range(n_docs):
+            freqs = X_dense[d, :]
+            nonzero_freqs = freqs[freqs > 0]
+            if len(nonzero_freqs) > 0:
+                mean_f = np.mean(nonzero_freqs)
+                std_f = np.std(nonzero_freqs)
+                band_inf[d] = mean_f + 0.5 * std_f
+                band_sup[d] = mean_f + 2.5 * std_f
+            if band_inf[d] >= band_sup[d] or token_counts[d] < 30:
+                band_inf[d] = 1.5
+                band_sup[d] = 4.5
 
-        if X_filtered.shape[1] == 0:
-            raise ValueError("El filtro AOF eliminó todos los términos. Revisa min_threshold/max_threshold y normalize_aof.")
+        self._df_banda = np.zeros(n_terms)
+        for t in range(n_terms):
+            col = X_dense[:, t]
+            for d in range(n_docs):
+                tf_abs = col[d]
+                if band_inf[d] <= tf_abs <= band_sup[d]:
+                    self._df_banda[t] += 1
 
-        FTD = np.asarray(X_filtered.sum(axis=1)).flatten()
-        FTC = np.asarray(X_filtered.sum(axis=0)).flatten()
-        total_collection_terms = FTC.sum()
-        self.FTD = FTD
-        self.FTC = FTC
-        self.PDC_doc = (
-            FTD / total_collection_terms
-            if total_collection_terms > 0
-            else np.zeros_like(FTD, dtype=float)
-        )
-
-        doc_freq = np.asarray((X_filtered > 0).sum(axis=0)).flatten()
-        self._idf = np.log(n_docs / (doc_freq + 1e-8))
-
-        inv_FTC = np.zeros_like(FTC, dtype=float)
-        nonzero = FTC > 0
-        inv_FTC[nonzero] = 1.0 / FTC[nonzero]
-        self._inv_FTC = inv_FTC
+        self._idf = np.array([
+            math.log(1 + n_docs / (df_val + 1))
+            for df_val in self._df_banda
+        ])
+        self._vocabulary = {term: idx for idx, term in enumerate(feature_names)}
 
         return self
 
     def transform(self, documents: list[str]) -> np.ndarray:
         if self._idf is None:
             raise ValueError("El vectorizador no ha sido ajustado. Llama a fit() primero.")
-        X = self.vectorizer.transform(documents)[:, self._valid_mask].tocsr()
-
-        if not self.use_pdc:
-            return np.asarray(X.multiply(self._idf).toarray())
-
-        pdc_term_doc = X.multiply(self._inv_FTC).tocsr()
+        X = self.vectorizer.transform(documents).tocsr()
         idf_broadcast = sparse.csr_matrix(self._idf.reshape(1, -1))
-        score = pdc_term_doc.multiply(idf_broadcast)
+        score = X.multiply(idf_broadcast)
         return np.asarray(score.toarray())
 
     def fit_transform(self, documents: list[str]) -> np.ndarray:

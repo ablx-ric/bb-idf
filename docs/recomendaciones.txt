@@ -1,4 +1,4 @@
-# Evaluación integral de TF-IDF, TextRank y TFPDC
+# Evaluacion integral de TF-IDF, TextRank y BB-IDF
 
 Actualmente la comparación solo incluye:
 - Tamaño del vocabulario (vocab)
@@ -84,7 +84,7 @@ Ejemplo:
 
 TF-IDF.pkl
 TextRank.pkl
-TFPDC.pkl
+bbidf.pkl
 
 ---
 
@@ -137,7 +137,7 @@ Comparar:
 - dispersión
 - presencia de valores extremos
 
-Especialmente importante para justificar matemáticamente TFPDC.
+Especialmente importante para justificar matematicamente BB-IDF.
 
 ---
 
@@ -218,7 +218,7 @@ Derivar la complejidad temporal y espacial de:
 
 - TF-IDF
 - TextRank
-- TFPDC
+- BB-IDF
 
 Explicar cada una mediante notación Big-O.
 
@@ -367,4 +367,4 @@ Para diferentes tamaños del corpus:
 16. Análisis estadístico
 17. Visualizaciones comparativas
 
-Objetivo final: obtener una evaluación completa que compare TF-IDF, TextRank y TFPDC tanto desde el punto de vista computacional (eficiencia, memoria, escalabilidad) como desde el punto de vista de recuperación de información (calidad, precisión y robustez), cumpliendo estándares de una investigación científica.
+Objetivo final: obtener una evaluacion completa que compare TF-IDF, TextRank y BB-IDF tanto desde el punto de vista computacional (eficiencia, memoria, escalabilidad) como desde el punto de vista de recuperacion de informacion (calidad, precision y robustez), cumpliendo estandares de una investigacion cientifica.

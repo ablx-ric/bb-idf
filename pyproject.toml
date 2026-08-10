@@ -1,7 +1,7 @@
 [project]
 name = "tf-inst"
 version = "0.1.0"
-description = "Comparacion de algoritmos de ponderacion de terminos (TF-IDF, TextRank, TF-PDC) para recuperacion de informacion en espanol"
+description = "Comparacion de algoritmos de ponderacion de terminos (TF-IDF, TextRank, BB-IDF) para recuperacion de informacion en espanol"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
