@@ -3,11 +3,23 @@ from scipy.stats import shapiro, kruskal, mannwhitneyu
 
 
 def check_normality(values: list[float], name: str) -> dict:
+    n = len(values)
+    if n < 3:
+        return {
+            "variable": name,
+            "n": n,
+            "mean": float(np.mean(values)),
+            "std": float(np.std(values, ddof=1)),
+            "shapiro_w": None,
+            "shapiro_p": None,
+            "is_normal": False,
+            "interpretation": f"Muestra insuficiente (n={n}<3, Shapiro-Wilk requiere n>=3)",
+        }
     stat, p = shapiro(values)
     normal = p > 0.05
     return {
         "variable": name,
-        "n": len(values),
+        "n": n,
         "mean": float(np.mean(values)),
         "std": float(np.std(values, ddof=1)),
         "shapiro_w": round(stat, 4),
@@ -27,10 +39,7 @@ def compare_algorithms(data: dict[str, list[float]]) -> dict:
     if len(groups) >= 2:
         if all_normal:
             from pingouin import anova
-            df_list = []
-            for n in names:
-                for v in data[n]:
-                    df_list.append({"algorithm": n, "value": v})
+            df_list = [{"algorithm": n, "value": v} for n in names for v in data[n]]
             import pandas as pd
             df = pd.DataFrame(df_list)
             aov = anova(dv="value", between="algorithm", data=df, detailed=True)
@@ -49,10 +58,10 @@ def compare_algorithms(data: dict[str, list[float]]) -> dict:
 
         posthoc = []
         if test_p < 0.05:
+            from pingouin import compute_effsize
             for i in range(len(names)):
                 for j in range(i + 1, len(names)):
                     u_stat, p_pair = mannwhitneyu(data[names[i]], data[names[j]])
-                    from pingouin import compute_effsize
                     d = compute_effsize(data[names[i]], data[names[j]], eftype="cohen")
                     posthoc.append({
                         "comparison": f"{names[i]} vs {names[j]}",
@@ -82,15 +91,20 @@ def compare_algorithms(data: dict[str, list[float]]) -> dict:
 
 
 def format_report(result: dict) -> str:
-    lines = []
-    lines.append("=" * 60)
-    lines.append("ANALISIS ESTADISTICO")
-    lines.append("=" * 60)
-    lines.append("")
-
-    lines.append("Normalidad (Shapiro-Wilk):")
+    lines = [
+        "=" * 60,
+        "ANALISIS ESTADISTICO",
+        "=" * 60,
+        "",
+        "Normalidad (Shapiro-Wilk):",
+    ]
     for n, r in result["normality"].items():
-        lines.append(f"  {n}: W={r['shapiro_w']:.3f}, p={r['shapiro_p']:.3f} -> {r['interpretation']}")
+        if r["shapiro_w"] is not None:
+            lines.append(
+                f"  {n}: W={r['shapiro_w']:.3f}, p={r['shapiro_p']:.3f} -> {r['interpretation']}"
+            )
+        else:
+            lines.append(f"  {n}: {r['interpretation']}")
     lines.append(f"  Todos normales: {'Si' if result['all_normal'] else 'No'}")
     lines.append("")
 
@@ -98,14 +112,21 @@ def format_report(result: dict) -> str:
     if result["test_statistic"] is not None:
         lines.append(f"  Estadistico: {result['test_statistic']}")
         lines.append(f"  p-valor: {result['p_value']}")
-        lines.append(f"  Significativo (p<0.05): {'Si' if result['significant'] else 'No'}")
+        lines.append(
+            f"  Significativo (p<0.05): {'Si' if result['significant'] else 'No'}"
+        )
     if result["effect_size"] is not None:
-        lines.append(f"  Tamano del efecto ({result['effect_name']}): {result['effect_size']}")
+        lines.append(
+            f"  Tamano del efecto ({result['effect_name']}): {result['effect_size']}"
+        )
     lines.append("")
 
     if result["posthoc"]:
         lines.append("Comparaciones post-hoc (Mann-Whitney + Cohen's d):")
         for p in result["posthoc"]:
-            lines.append(f"  {p['comparison']}: U={p['mannwhitney_u']}, p={p['p_value']}, d={p['cohens_d']}")
+            lines.append(
+                f"  {p['comparison']}: U={p['mannwhitney_u']}, "
+                f"p={p['p_value']}, d={p['cohens_d']}"
+            )
     lines.append("=" * 60)
     return "\n".join(lines)

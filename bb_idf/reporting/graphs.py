@@ -71,12 +71,12 @@ def plot_benchmark_bars(metrics: list[AlgoMetrics], output_dir: Path):
 
     fig, ax = plt.subplots(figsize=(3.5, 2.5))
     _bar_plot(ax, names, [m.vocab_size for m in metrics],
-              'Tama\xf1o del vocabulario', '{:d}')
+              'Tamanio del vocabulario', '{:d}')
     _save(fig, output_dir, 'benchmark_vocab_size')
 
     fig, ax = plt.subplots(figsize=(3.5, 2.5))
     _bar_plot(ax, names, [m.transform_time for m in metrics],
-              'Tiempo de transformaci\xf3n (s)', '{:.4f}s')
+              'Tiempo de transformacion (s)', '{:.4f}s')
     _save(fig, output_dir, 'benchmark_transform_time')
 
     fig, ax = plt.subplots(figsize=(3.5, 2.5))
@@ -86,7 +86,7 @@ def plot_benchmark_bars(metrics: list[AlgoMetrics], output_dir: Path):
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 2.8))
     _bar_plot(ax1, names, [m.fit_time for m in metrics], 'Tiempo de ajuste (s)', '{:.2f}s')
-    _bar_plot(ax2, names, [m.vocab_size for m in metrics], 'Tama\xf1o del vocabulario', '{:d}')
+    _bar_plot(ax2, names, [m.vocab_size for m in metrics], 'Tamanio del vocabulario', '{:d}')
     _save(fig, output_dir, 'benchmark_panel_times')
 
 
@@ -108,7 +108,7 @@ def plot_memory(metrics: list[AlgoMetrics], output_dir: Path):
     _bar_plot(ax1, names, [m.matrix_memory_kb for m in metrics],
               'Memoria de matriz (KB)', '{:.1f}')
     _bar_plot(ax2, names, [m.serialized_size_kb for m in metrics],
-              'Tama\xf1o serializado (KB)', '{:.1f}')
+              'Tamanio serializado (KB)', '{:.1f}')
     _save(fig, output_dir, 'benchmark_memory')
 
 
@@ -170,35 +170,30 @@ def plot_similarity_heatmaps(metrics: list[AlgoMetrics], output_dir: Path):
         _save(fig, output_dir, f'similarity_{m.name}')
 
 
-def plot_weight_distribution(metrics: list[AlgoMetrics], docs_processed: list[str],
-                              vectorizers: dict, output_dir: Path):
+def plot_weight_distribution(metrics: list[AlgoMetrics], output_dir: Path):
     _apply_style()
-    for name, vec in vectorizers.items():
-        try:
-            mat = vec.fit_transform(docs_processed)
-        except Exception:
-            continue
-        values = mat[mat > 0].flatten()
+    for m in metrics:
+        values = m.weight_matrix[m.weight_matrix > 0].flatten()
         if len(values) == 0:
+            print(f"  ADVERTENCIA: {m.name} no tiene pesos positivos para graficar")
             continue
 
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(7, 2.8))
         ax1.hist(values, bins=50, color=OKABE_ITO[0], edgecolor='black', linewidth=0.3)
         ax1.set_xlabel('Peso')
         ax1.set_ylabel('Frecuencia')
-        ax1.set_title(f'{name} - Histograma')
+        ax1.set_title(f'{m.name} - Histograma')
 
         ax2.boxplot(values, vert=True, patch_artist=True,
                     boxprops=dict(facecolor=OKABE_ITO[1], alpha=0.6),
                     medianprops=dict(color='black'))
         ax2.set_ylabel('Peso')
-        ax2.set_xticklabels([name])
+        ax2.set_xticklabels([m.name])
         ax2.set_title('Boxplot')
-        _save(fig, output_dir, f'weight_distribution_{name}')
+        _save(fig, output_dir, f'weight_distribution_{m.name}')
 
 
-def plot_all(metrics: list[AlgoMetrics], docs_processed: list[str],
-             vectorizers: dict, output_dir: Path):
+def plot_all(metrics: list[AlgoMetrics], output_dir: Path):
     figures_dir = output_dir / 'figures'
     print("\nGenerando graficos...")
     plot_benchmark_bars(metrics, figures_dir)
@@ -206,5 +201,5 @@ def plot_all(metrics: list[AlgoMetrics], docs_processed: list[str],
     plot_memory(metrics, figures_dir)
     plot_retrieval_metrics(metrics, figures_dir)
     plot_similarity_heatmaps(metrics, figures_dir)
-    plot_weight_distribution(metrics, docs_processed, vectorizers, figures_dir)
+    plot_weight_distribution(metrics, figures_dir)
     print(f"  Graficos guardados en: {figures_dir}")

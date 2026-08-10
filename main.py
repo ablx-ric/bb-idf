@@ -19,10 +19,15 @@ def _build_vectorizers():
 
 
 def main():
-    parser = argparse.ArgumentParser(description="bb-idf: comparacion de algoritmos de ponderacion de terminos")
-    parser.add_argument("--graphs", action="store_true", help="Generar graficos de los resultados")
-    parser.add_argument("--runs", type=int, default=1, help="Numero de ejecuciones para calcular media +/- std (defecto: 1)")
-    parser.add_argument("--scalability", action="store_true", help="Ejecutar prueba de escalabilidad con subconjuntos del corpus")
+    parser = argparse.ArgumentParser(
+        description="bb-idf: comparacion de algoritmos de ponderacion de terminos"
+    )
+    parser.add_argument("--graphs", action="store_true",
+                        help="Generar graficos de los resultados")
+    parser.add_argument("--runs", type=int, default=1,
+                        help="Numero de ejecuciones para media +/- std (defecto: 1)")
+    parser.add_argument("--scalability", action="store_true",
+                        help="Prueba de escalabilidad con subconjuntos del corpus")
     args = parser.parse_args()
 
     corpus_dir = Path("data/corpus")
@@ -70,11 +75,17 @@ def main():
 
         print("\nResumen (media +/- std):")
         for row in df_summary.iter_rows(named=True):
-            print(f"  {row['algorithm']:>8}  |  fit={row['fit_time_mean']}s +/-{row['fit_time_std']}s  |  "
-                  f"MAP={row['MAP_mean']} +/-{row['MAP_std']}  |  sparsity={row['sparsity_mean']}")
+            print(f"  {row['algorithm']:>8}  |  "
+                  f"fit={row['fit_time_mean']}s +/-{row['fit_time_std']}s  |  "
+                  f"MAP={row['MAP_mean']} +/-{row['MAP_std']}  |  "
+                  f"sparsity={row['sparsity_mean']}")
 
-        fit_data = {row['algorithm']: df_all.filter(pl.col('algorithm') == row['algorithm'])['fit_time_s'].to_list()
-                    for row in df_summary.iter_rows(named=True)}
+        fit_data = {
+            row['algorithm']: df_all.filter(
+                pl.col('algorithm') == row['algorithm']
+            )['fit_time_s'].to_list()
+            for row in df_summary.iter_rows(named=True)
+        }
         if len(fit_data) >= 2:
             stat_result = compare_algorithms(fit_data)
             report = format_report(stat_result)
@@ -85,8 +96,7 @@ def main():
             print(f"  Analisis estadistico guardado: {stats_path}")
 
         if args.graphs and last_benchmark is not None:
-            processed = last_benchmark._last_docs_processed
-            plot_all(last_benchmark.result.metrics, processed, _build_vectorizers(), output_dir)
+            plot_all(last_benchmark.result.metrics, output_dir)
     else:
         benchmark = Benchmark()
         vectorizers = _build_vectorizers()
@@ -95,7 +105,7 @@ def main():
 
         print("\nResultados:")
         headers = ["algoritmo", "vocab", "shape", "fit(s)", "transf(s)", "query(s)",
-                    "sparsity", "mem(KB)", "P@5", "R@5", "nDCG@5", "MAP", "MRR"]
+                   "sparsity", "mem(KB)", "P@5", "R@5", "nDCG@5", "MAP", "MRR"]
         print(f"  {' | '.join(f'{h:>10}' for h in headers)}")
         print("  " + "-" * (13 * len(headers)))
         for row in df.iter_rows(named=True):
@@ -116,18 +126,16 @@ def main():
         print(f"  Benchmark guardado: {output_dir / 'benchmark' / 'benchmark.csv'}")
 
         if args.graphs:
-            processed = benchmark._last_docs_processed
-            plot_all(benchmark.result.metrics, processed, _build_vectorizers(), output_dir)
+            plot_all(benchmark.result.metrics, output_dir)
 
     if args.scalability:
         print("\nEjecutando prueba de escalabilidad...")
         sizes_path = output_dir / "metrics" / "scalability.csv"
         sizes_path.parent.mkdir(parents=True, exist_ok=True)
         scalability_rows = []
-        sizes = [5, 10, 20, 0]
-        sizes = [s for s in sizes if s <= len(documents)]
-        if 0 in sizes or len(documents) not in sizes:
-            sizes = sorted(set(s for s in sizes if s > 0)) + [len(documents)]
+        sizes = [5, 10, 20]
+        if len(documents) not in sizes:
+            sizes.append(len(documents))
         for size in sizes:
             subset = documents[:size]
             q_sub = queries[:min(5, size)]

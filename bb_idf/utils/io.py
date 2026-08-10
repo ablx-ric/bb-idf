@@ -1,3 +1,4 @@
+import sys
 from pathlib import Path
 
 import polars as pl
@@ -5,22 +6,24 @@ import fitz
 
 
 def load_text_files(corpus_dir: str | Path) -> list[tuple[str, str]]:
-    """Carga documentos .txt y .pdf de un directorio.
-
-    Returns:
-        Lista de (nombre_archivo, contenido).
-    """
     path = Path(corpus_dir)
     docs: list[tuple[str, str]] = []
 
     for f in sorted(path.glob("*.txt")):
-        docs.append((f.stem, f.read_text(encoding="utf-8")))
+        try:
+            docs.append((f.stem, f.read_text(encoding="utf-8")))
+        except UnicodeDecodeError:
+            print(f"  ADVERTENCIA: {f.name} no es UTF-8, omitiendo", file=sys.stderr)
 
     for f in sorted(path.glob("*.pdf")):
-        doc = fitz.open(f)
-        text = "".join(page.get_text() for page in doc)
-        doc.close()
-        docs.append((f.stem, text))
+        try:
+            doc = fitz.open(f)
+            text = "".join(page.get_text() for page in doc)
+            doc.close()
+            docs.append((f.stem, text))
+        except Exception as exc:
+            print(f"  ADVERTENCIA: {f.name} no se pudo leer ({exc}), omitiendo",
+                  file=sys.stderr)
 
     return docs
 

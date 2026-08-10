@@ -1,6 +1,6 @@
 import pickle
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import polars as pl
@@ -22,11 +22,12 @@ class AlgoMetrics:
     matrix_memory_kb: float
     serialized_size_kb: float
     sim_matrix: np.ndarray
-    precision_scores: dict[int, float]
-    recall_scores: dict[int, float]
-    ndcg_scores: dict[int, float]
-    map_score: float
-    mrr_score: float
+    weight_matrix: np.ndarray = field(repr=False)
+    precision_scores: dict[int, float] = field(default_factory=dict)
+    recall_scores: dict[int, float] = field(default_factory=dict)
+    ndcg_scores: dict[int, float] = field(default_factory=dict)
+    map_score: float = 0.0
+    mrr_score: float = 0.0
 
 
 @dataclass
@@ -41,6 +42,7 @@ class Benchmark:
     def __init__(self, preprocessor: Preprocessor | None = None):
         self.preprocessor = preprocessor or Preprocessor()
         self.result: BenchmarkResult | None = None
+        self.docs_processed: list[str] = []
 
     def run(
         self,
@@ -49,20 +51,18 @@ class Benchmark:
         vectorizers: dict[str, object],
     ) -> pl.DataFrame:
         evaluator = Evaluator()
-        rows = []
+        rows: list[dict] = []
         all_metrics: list[AlgoMetrics] = []
 
-        docs_processed = [self.preprocessor(d) for d in documents]
+        self.docs_processed = [self.preprocessor(d) for d in documents]
         queries_processed = [self.preprocessor(q) for q in queries]
 
-        self._last_docs_processed = docs_processed
-
         n_queries = len(queries_processed)
-        query_relevant = [[i] for i in range(min(n_queries, len(docs_processed)))]
+        query_relevant = [[i] for i in range(min(n_queries, len(self.docs_processed)))]
 
         for name, vec in vectorizers.items():
             t0 = time.perf_counter()
-            D = vec.fit_transform(docs_processed)
+            D = vec.fit_transform(self.docs_processed)
             fit_time = time.perf_counter() - t0
 
             t0 = time.perf_counter()
@@ -84,30 +84,27 @@ class Benchmark:
             sparsity = 1.0 - (nnz / total_cells) if total_cells > 0 else 0.0
             density = nnz / total_cells if total_cells > 0 else 0.0
 
-            matrix_memory = D.nbytes / 1024.0 if hasattr(D, 'nbytes') else (nnz * 8) / 1024.0
+            matrix_memory = D.nbytes / 1024.0
 
             serialized = pickle.dumps(vec)
             serialized_size = len(serialized) / 1024.0
 
-            precision_scores = {}
-            recall_scores = {}
-            ndcg_scores = {}
+            precision_scores: dict[int, float] = {}
+            recall_scores: dict[int, float] = {}
+            ndcg_scores: dict[int, float] = {}
             for k in [1, 3, 5, 10]:
-                precs = [
+                precision_scores[k] = round(float(np.mean([
                     evaluator.precision_at_k(rel, ret, k=k)
                     for rel, ret in zip(query_relevant, query_retrieved)
-                ]
-                recs = [
+                ])), 4)
+                recall_scores[k] = round(float(np.mean([
                     evaluator.recall_at_k(rel, ret, k=k)
                     for rel, ret in zip(query_relevant, query_retrieved)
-                ]
-                ndcgs = [
+                ])), 4)
+                ndcg_scores[k] = round(float(np.mean([
                     evaluator.ndcg_at_k(rel, ret, k=k)
                     for rel, ret in zip(query_relevant, query_retrieved)
-                ]
-                precision_scores[k] = round(float(np.mean(precs)), 4)
-                recall_scores[k] = round(float(np.mean(recs)), 4)
-                ndcg_scores[k] = round(float(np.mean(ndcgs)), 4)
+                ])), 4)
 
             map_score = round(
                 evaluator.mean_average_precision(query_relevant, query_retrieved), 4
@@ -128,6 +125,7 @@ class Benchmark:
                 matrix_memory_kb=round(matrix_memory, 2),
                 serialized_size_kb=round(serialized_size, 2),
                 sim_matrix=sim_matrix,
+                weight_matrix=D,
                 precision_scores=precision_scores,
                 recall_scores=recall_scores,
                 ndcg_scores=ndcg_scores,
