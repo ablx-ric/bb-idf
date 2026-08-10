@@ -163,35 +163,35 @@ Inversa del rango del primer relevante. Con relevante en posicion 1, $MRR = 1.0$
 
 ## Resultados
 
-### Tiempo de ajuste (5 corridas)
-
-| Algoritmo | Media (s) | Std (s) | Min (s) | Max (s) |
-|-----------|-----------|---------|---------|---------|
-| TF-IDF | 0.3237 | 0.0143 | 0.31 | 0.34 |
-| BB-IDF | 0.6279 | 0.0224 | 0.60 | 0.66 |
-| TextRank | 7.2732 | 0.1036 | 7.16 | 7.40 |
-
-TextRank es ~22x mas lento que TF-IDF y ~12x mas lento que BB-IDF.
-
-### Tiempo de transformacion
+### Tiempo de ajuste (10 corridas)
 
 | Algoritmo | Media (s) | Std (s) |
 |-----------|-----------|---------|
-| TF-IDF | 0.0392 | 0.0042 |
-| BB-IDF | 0.0384 | 0.0026 |
-| TextRank | 1.1587 | 0.0330 |
+| TF-IDF | 0.2557 | 0.0123 |
+| BB-IDF | 0.9431 | 0.0376 |
+| TextRank | 6.4596 | 0.0504 |
 
-TextRank es ~30x mas lento en inferencia que TF-IDF y BB-IDF.
+TextRank es ~25x mas lento que TF-IDF y ~7x mas lento que BB-IDF. BB-IDF es ~3.7x mas lento que TF-IDF (costo del filtro de banda).
+
+### Tiempo de transformacion (10 corridas)
+
+| Algoritmo | Media (s) | Std (s) |
+|-----------|-----------|---------|
+| TF-IDF | 0.0303 | 0.0019 |
+| BB-IDF | 0.0593 | 0.0018 |
+| TextRank | 1.0346 | 0.0185 |
+
+TextRank es ~34x mas lento en inferencia que TF-IDF. BB-IDF es ~2x mas lento que TF-IDF por el calculo de banda y filtro en transform.
 
 ### Sparsity y Memoria
 
 | Algoritmo | Vocab | Sparsity | Memoria (KB) |
 |-----------|-------|----------|--------------|
 | TF-IDF | 21,330 | 0.9092 | 5,665.78 |
-| BB-IDF | 21,330 | 0.9092 | 5,665.78 |
+| BB-IDF | 21,330 | **0.9938** | 5,665.78 |
 | TextRank | 24,636 | 0.9181 | 6,543.94 |
 
-TextRank produce un vocabulario ~15% mayor (incluye terminos con puntuacion TextRank > 0). TF-IDF y BB-IDF comparten el mismo vocabulario y matriz (CountVectorizer base).
+BB-IDF produce la matriz mas dispersa (99.38% ceros) gracias al filtro de banda que anula terminos fuera del rango [1.5, 4.5] en docs cortos o fuera de la banda estadistica en docs largos. TextRank genera un vocabulario ~15% mayor.
 
 ### Metricas de recuperacion
 
@@ -207,23 +207,23 @@ Identicos. Ver seccion de metricas identicas.
 
 | n_docs | TF-IDF (s) | TextRank (s) | BB-IDF (s) |
 |--------|------------|--------------|------------|
-| 5 | 0.0741 | 1.1742 | 0.1683 |
-| 10 | 0.1525 | 1.7430 | 0.3025 |
-| 20 | 0.3092 | 3.9089 | 0.4983 |
-| 34 | 0.5167 | 7.9811 | 0.8218 |
+| 5 | 0.0367 | 1.0165 | 0.1012 |
+| 10 | 0.0571 | 1.4310 | 0.1850 |
+| 20 | 0.1222 | 3.1240 | 0.4563 |
+| 34 | 0.2437 | 6.4476 | 0.9056 |
 
-TF-IDF y BB-IDF escalan linealmente con el numero de documentos. TextRank tiene crecimiento super-lineal (componente $O(n^2)$ en construccion de grafo de co-ocurrencia).
+TF-IDF y BB-IDF escalan linealmente con el numero de documentos ($R^2 \approx 0.99$). TextRank tiene crecimiento super-lineal ($R^2 \approx 0.99$ en escala cuadratica) por la construccion del grafo de co-ocurrencia.
 
-### Analisis estadistico
+### Analisis estadistico (10 corridas)
 
-- **Normalidad**: Los 3 algoritmos pasan Shapiro-Wilk (todos p > 0.05)
-- **ANOVA**: $F = 20222.85$, $p < 0.001$, $\eta_p^2 = 0.9997$ (diferencias altamente significativas)
+- **Normalidad**: BB-IDF (W=0.659, p=0.000, no normal), TextRank (W=0.891, p=0.174, normal), TF-IDF (W=0.621, p=0.000, no normal)
+- **Kruskal-Wallis**: $H = 25.81$, $p < 0.001$ (diferencias altamente significativas)
 - **Post-hoc (Mann-Whitney + Cohen's d)**:
-  - TF-IDF vs TextRank: $U=25$, $p=0.008$, $d=93.96$
-  - BB-IDF vs TextRank: $U=25$, $p=0.008$, $d=88.66$
-  - TF-IDF vs BB-IDF: $U=0$, $p=0.008$, $d=-16.19$
+  - BB-IDF vs TextRank: $U=0$, $p=0.0002$, $d=-124.10$
+  - BB-IDF vs TF-IDF: $U=100$, $p=0.0002$, $d=24.56$
+  - TextRank vs TF-IDF: $U=100$, $p=0.0002$, $d=169.21$
 
-Todas las diferencias son significativas. El tamano del efecto (Cohen's d) es extremadamente grande ($|d| > 16$) en todos los pares, indicando que los algoritmos tienen rendimientos fundamentalmente distintos en tiempo de ejecucion.
+Todas las diferencias son significativas ($p < 0.001$). Los tamanos del efecto (Cohen's d) son extremadamente grandes ($|d| > 24$) en todos los pares, confirmando que los 3 algoritmos tienen rendimientos fundamentalmente distintos en tiempo de ejecucion. Con 10 corridas, BB-IDF y TF-IDF muestran distribuciones no-normales (sesgadas hacia la derecha), requiriendo Kruskal-Wallis en lugar de ANOVA.
 
 ## Graficos
 
