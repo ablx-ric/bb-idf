@@ -3,9 +3,9 @@ ANALISIS ESTADISTICO
 ============================================================
 
 Normalidad (Shapiro-Wilk):
-  bbidf: W=0.884, p=0.326 -> Normal
-  textrank: W=0.606, p=0.001 -> No normal
-  tfidf: W=0.725, p=0.017 -> No normal
+  bbidf: W=0.774, p=0.049 -> No normal
+  textrank: W=0.690, p=0.007 -> No normal
+  tfidf: W=0.881, p=0.315 -> Normal
   Todos normales: No
 
 Prueba: Kruskal-Wallis
@@ -14,7 +14,7 @@ Prueba: Kruskal-Wallis
   Significativo (p<0.05): Si
 
 Comparaciones post-hoc (Mann-Whitney + Cohen's d):
-  bbidf vs textrank: U=0, p=0.0079, d=-25.642
-  bbidf vs tfidf: U=25, p=0.0079, d=10.034
-  textrank vs tfidf: U=25, p=0.0079, d=29.027
+  bbidf vs textrank: U=0, p=0.0079, d=-64.078
+  bbidf vs tfidf: U=25, p=0.0079, d=24.097
+  textrank vs tfidf: U=25, p=0.0079, d=77.852
 ============================================================

@@ -83,9 +83,22 @@ class TestBBIDF:
         with pytest.raises(ValueError):
             vec.transform(["hola"])
 
-    def test_self_similarity_is_max(self):
-        docs = ["turismo naturaleza aventura", "ruinas arqueologia historia"]
+    def test_band_filter_passes_relevant_terms(self):
+        """Terminos con TF dentro de la banda reciben score positivo."""
+        docs = ["turismo turismo naturaleza aventura turismo",
+                 "ruinas ruinas arqueologia ruinas historia"]
         vec = BBIDF()
         X = vec.fit_transform(docs)
         assert X[0, vec._vocabulary["turismo"]] > 0
         assert X[1, vec._vocabulary["ruinas"]] > 0
+
+    def test_band_filter_removes_noise(self):
+        """TF=1 no pasa la banda [1.5, 4.5] de docs cortos -> score cero."""
+        docs = ["turismo turismo naturaleza",
+                 "naturaleza naturaleza turismo"]
+        vec = BBIDF()
+        X = vec.fit_transform(docs)
+        assert X[0, vec._vocabulary["turismo"]] > 0
+        assert X[0, vec._vocabulary["naturaleza"]] == 0.0
+        assert X[1, vec._vocabulary["naturaleza"]] > 0
+        assert X[1, vec._vocabulary["turismo"]] == 0.0
