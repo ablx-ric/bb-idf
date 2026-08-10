@@ -1,9 +1,11 @@
 from pathlib import Path
+from collections import Counter
 
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 import numpy as np
 import seaborn as sns
+from wordcloud import WordCloud
 
 from bb_idf.evaluation.benchmark import AlgoMetrics
 
@@ -202,4 +204,63 @@ def plot_all(metrics: list[AlgoMetrics], output_dir: Path):
     plot_retrieval_metrics(metrics, figures_dir)
     plot_similarity_heatmaps(metrics, figures_dir)
     plot_weight_distribution(metrics, figures_dir)
+    plot_wordclouds(metrics, figures_dir)
+    plot_keyword_frequency(metrics, figures_dir)
     print(f"  Graficos guardados en: {figures_dir}")
+
+
+def plot_wordclouds(metrics: list[AlgoMetrics], output_dir: Path):
+    for m in metrics:
+        term_scores = {}
+        for kw_list in m.keywords:
+            for term, score in kw_list:
+                term_scores[term] = term_scores.get(term, 0) + score
+
+        if not term_scores:
+            continue
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        wc = WordCloud(
+            width=800, height=500,
+            background_color='white',
+            colormap='viridis',
+            max_words=100,
+            relative_scaling=0.5,
+        ).generate_from_frequencies(term_scores)
+        ax.imshow(wc, interpolation='bilinear')
+        ax.axis('off')
+        ax.set_title(f'{m.name} - Nube de palabras clave', fontsize=11)
+        _save(fig, output_dir, f'wordcloud_{m.name}')
+
+
+def plot_keyword_frequency(metrics: list[AlgoMetrics], output_dir: Path):
+    _apply_style()
+    n_metrics = len(metrics)
+    fig, axes = plt.subplots(1, n_metrics, figsize=(5 * n_metrics, 4))
+    if n_metrics == 1:
+        axes = [axes]
+
+    for ax, m in zip(axes, metrics):
+        counter = Counter()
+        for kw_list in m.keywords:
+            for term, _ in kw_list:
+                counter[term] += 1
+
+        top = counter.most_common(20)
+        if not top:
+            ax.text(0.5, 0.5, 'Sin datos', ha='center', va='center',
+                    transform=ax.transAxes)
+            continue
+
+        terms, counts = zip(*top)
+        colors = OKABE_ITO[:1] * len(terms)
+        ax.barh(range(len(terms)), counts, color=colors, edgecolor='black',
+                linewidth=0.3)
+        ax.set_yticks(range(len(terms)))
+        ax.set_yticklabels(terms, fontsize=7)
+        ax.invert_yaxis()
+        ax.set_xlabel('Documentos en top-5')
+        ax.set_title(f'{m.name}', fontsize=9)
+
+    fig.suptitle('Frecuencia de palabras clave (top-20)', fontsize=11)
+    _save(fig, output_dir, 'keyword_frequency')

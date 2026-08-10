@@ -23,6 +23,7 @@ class AlgoMetrics:
     serialized_size_kb: float
     sim_matrix: np.ndarray
     weight_matrix: np.ndarray = field(repr=False)
+    keywords: list[list[tuple[str, float]]] = field(default_factory=list)
     precision_scores: dict[int, float] = field(default_factory=dict)
     recall_scores: dict[int, float] = field(default_factory=dict)
     ndcg_scores: dict[int, float] = field(default_factory=dict)
@@ -86,6 +87,8 @@ class Benchmark:
 
             matrix_memory = D.nbytes / 1024.0
 
+            keywords = evaluator.extract_keywords(D, vec.vocabulary)
+
             serialized = pickle.dumps(vec)
             serialized_size = len(serialized) / 1024.0
 
@@ -126,6 +129,7 @@ class Benchmark:
                 serialized_size_kb=round(serialized_size, 2),
                 sim_matrix=sim_matrix,
                 weight_matrix=D,
+                keywords=keywords,
                 precision_scores=precision_scores,
                 recall_scores=recall_scores,
                 ndcg_scores=ndcg_scores,

@@ -123,6 +123,23 @@ def main():
             sim_df = pl.DataFrame(res.sim_matrix)
             sim_df.write_csv(metrics_path)
 
+            kw_path = output_dir / "metrics" / f"{res.name}_keywords.csv"
+            kw_rows = []
+            for doc_id, kw_list in enumerate(res.keywords):
+                for rank, (term, score) in enumerate(kw_list, 1):
+                    kw_rows.append({
+                        "doc_id": doc_id + 1,
+                        "rank": rank,
+                        "term": term,
+                        "score": score,
+                    })
+            pl.DataFrame(kw_rows).write_csv(kw_path)
+
+        print(f"\nTop-5 keywords por algoritmo (Documento 1):")
+        for res in benchmark.result.metrics:
+            kw_str = ", ".join(t for t, _ in res.keywords[0][:5])
+            print(f"  {res.name:>8}: {kw_str}")
+
         print(f"  Benchmark guardado: {output_dir / 'benchmark' / 'benchmark.csv'}")
 
         if args.graphs:

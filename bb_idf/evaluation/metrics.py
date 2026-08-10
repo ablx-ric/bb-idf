@@ -10,6 +10,22 @@ class Evaluator:
         return cosine_similarity(X, Y)
 
     @staticmethod
+    def extract_keywords(
+        weight_matrix: np.ndarray,
+        vocabulary: dict[str, int],
+        top_n: int = 5,
+    ) -> list[list[tuple[str, float]]]:
+        idx_to_term = {v: k for k, v in vocabulary.items()}
+        results = []
+        for row in weight_matrix:
+            top_idx = row.argsort()[::-1][:top_n]
+            results.append([
+                (idx_to_term[i], round(float(row[i]), 4))
+                for i in top_idx if row[i] > 0
+            ])
+        return results
+
+    @staticmethod
     def precision_at_k(
         relevant: list[int], retrieved: list[int], k: int = 5
     ) -> float:
