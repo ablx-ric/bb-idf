@@ -18,6 +18,9 @@ class Evaluator:
         idx_to_term = {v: k for k, v in vocabulary.items()}
         results = []
         for row in weight_matrix:
+            norm = np.linalg.norm(row)
+            if norm > 0:
+                row = row / norm
             top_idx = row.argsort()[::-1][:top_n]
             results.append([
                 (idx_to_term[i], round(float(row[i]), 4))

@@ -225,6 +225,23 @@ TF-IDF y BB-IDF escalan linealmente con el numero de documentos ($R^2 \approx 0.
 
 Todas las diferencias son significativas ($p < 0.001$). Los tamanos del efecto (Cohen's d) son extremadamente grandes ($|d| > 24$) en todos los pares, confirmando que los 3 algoritmos tienen rendimientos fundamentalmente distintos en tiempo de ejecucion. Con 10 corridas, BB-IDF y TF-IDF muestran distribuciones no-normales (sesgadas hacia la derecha), requiriendo Kruskal-Wallis en lugar de ANOVA.
 
+## Keywords
+
+Para cada documento se extraen los top-5 terminos con mayor peso, exportados a `output/metrics/{algo}_keywords.csv`. Los pesos se normalizan con **L2-normalizacion** por documento ($\frac{w_{t,d}}{\| \mathbf{w}_d \|_2}$) para que los scores sean comparables entre algoritmos en escala $[0, 1]$:
+
+$$w_{t,d}^{norm} = \frac{w_{t,d}}{\sqrt{\sum_{t'} w_{t',d}^2}}$$
+
+Adicionalmente se generan nubes de palabras (`wordcloud_{algo}.png`) y un grafico de frecuencia (`keyword_frequency.png`) con los 20 terminos que mas aparecen en el top-5 entre todos los documentos.
+
+### Preprocesamiento de keywords
+
+El pipeline de preprocesamiento aplica los siguientes filtros para evitar artefactos en el top-5:
+
+- **Stopwords**: removidas via spaCy `token.is_stop`
+- **Numeros**: excluidos via `token.like_num` (evita que anos, cifras y codigos dominen el ranking)
+- **Tokens cortos**: excluidos con `len(token) < 3` (elimina fragmentos, siglas de una letra, etc.)
+- **Signos de puntuacion y espacios**: excluidos via `token.is_punct / is_space`
+
 ## Graficos
 
 ### Informativos (diferencian algoritmos)

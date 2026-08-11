@@ -33,5 +33,9 @@ class Preprocessor:
 
     def __call__(self, text: str) -> str:
         doc = self._nlp(text)
-        tokens = [t.lemma_.lower() for t in doc if not t.is_punct and not t.is_space and not t.is_stop]
+        tokens = [
+            t.lemma_.lower() for t in doc
+            if not t.is_punct and not t.is_space and not t.is_stop
+            and not t.like_num and len(t.text) >= 3
+        ]
         return " ".join(tokens)
