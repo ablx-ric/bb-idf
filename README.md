@@ -219,6 +219,24 @@ de mejora es 0%** (dominan los empates): la ventaja es real pero concentrada en
 
 (Preprocesado spaCy: ~60 s, una sola vez y cacheado.)
 
+### 8.5 Similitud de ranking con TextRank (análisis suplementario)
+
+Además de la calidad, se mide cuánto se **parece** el ranking de cada algoritmo
+al de TextRank (convergencia de comportamiento, no calidad). Métricas: RBO
+(Rank-Biased Overlap, p=0.9), Jaccard@K y Overlap@K.
+
+| Métrica | TF-IDF | BB-IDF | p (pareado) | Cohen's d |
+|---|---|---|---|---|
+| RBO@10 | 0.401 | **0.459** | 0.0002 | +0.71 |
+| Jaccard@10 | 0.594 | **0.686** | 0.0003 | +0.86 |
+| Overlap@10 | 0.727 | **0.800** | 0.0006 | +0.78 |
+
+**BB-IDF es consistentemente más similar a TextRank que TF-IDF**, en todas las
+métricas y en todos los K (significativo en K ≥ 10, p < 0.005). Esto es coherente
+con el hallazgo principal: al aplanar el IDF a casi-constante, BB-IDF se comporta
+como un ranking por frecuencia, más cercano al comportamiento de TextRank que al
+de TF-IDF. (Interpretación como *convergencia de rankings*, no como calidad.)
+
 ---
 
 ## 9. Conclusiones (respuestas a la pregunta de investigación)
@@ -300,7 +318,7 @@ results/
 │                   improvement_bbidf_vs_tfidf.csv, gap_to_textrank.csv
 ├── metrics/        keywords_ranked.csv (score L2 + raw), top10_keywords.csv
 ├── statistical/    paired_tests.csv, robustness.csv, band_diagnostic.csv
-├── figures/        11 figuras PNG (ver §12)
+├── figures/        12 figuras PNG (ver §12)
 ├── tables/         case_analysis.md, per_document.md (Top-10 por documento con gold marcado)
 ├── per_document/   doc1/…doc33/: top-50 keywords (CSV) + nube de palabras por algoritmo,
 │                   y documents_index.csv (docX → archivo original)
@@ -341,6 +359,7 @@ uv run python main.py --scalability
 | `quality_time_tradeoff.png` | F1@10 vs tiempo (escala log) |
 | `wordclouds.png` | **Nubes de palabras** de cada algoritmo (score acumulado) |
 | `keyword_frequency.png` | Top-20 términos más frecuentes en el Top-10 de cada algoritmo |
+| `similarity_to_textrank.png` | Similitud de ranking con TextRank (RBO) de TF-IDF vs BB-IDF |
 
 ---
 

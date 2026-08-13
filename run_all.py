@@ -8,6 +8,7 @@ Ejecuta en orden:
     1. Experimento  (bb_idf.experiment.run)         -> results/{raw,processed,metrics,statistical}, metadata.json
     2. Figuras      (bb_idf.experiment.plots)       -> results/figures/
     3. Robustez + casos (bb_idf.experiment.robustness) -> results/statistical/, results/tables/
+    4. Similitud vs TextRank (bb_idf.experiment.similarity) -> results/processed/, results/figures/
 """
 
 from __future__ import annotations
@@ -42,7 +43,7 @@ def main() -> int:
             return 1
 
     print("=" * 60)
-    print("PASO 1/3: experimento (metricas + estadistica + eficiencia)")
+    print("PASO 1/4: experimento (metricas + estadistica + eficiencia)")
     print("=" * 60)
     cmd1 = [py, "-m", "bb_idf.experiment.run", "--ks", *map(str, args.ks),
             "--window", str(args.window)]
@@ -51,17 +52,24 @@ def main() -> int:
         return 1
 
     print("=" * 60)
-    print("PASO 2/3: figuras")
+    print("PASO 2/4: figuras")
     print("=" * 60)
     if _run([py, "-m", "bb_idf.experiment.plots"]) != 0:
         print("La generación de figuras falló.")
         return 1
 
     print("=" * 60)
-    print("PASO 3/3: robustez + analisis de casos")
+    print("PASO 3/4: robustez + analisis de casos")
     print("=" * 60)
     if _run([py, "-m", "bb_idf.experiment.robustness"]) != 0:
         print("La robustez/casos falló.")
+        return 1
+
+    print("=" * 60)
+    print("PASO 4/4: similitud vs TextRank (suplementario)")
+    print("=" * 60)
+    if _run([py, "-m", "bb_idf.experiment.similarity"]) != 0:
+        print("La similitud falló.")
         return 1
 
     print("\n" + "=" * 60)

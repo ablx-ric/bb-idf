@@ -247,6 +247,25 @@ potencia (muchos empates).
 magnitud más caro. El trade-off calidad/costo favorece a BB-IDF frente a
 TextRank.
 
+## 16b. Similitud de ranking con TextRank (análisis suplementario)
+
+Complementariamente a la calidad, se cuantifica cuánto se **parece** el ranking
+de cada algoritmo al de TextRank (medida de *convergencia de rankings*, no de
+calidad). Métricas: **RBO** (Rank-Biased Overlap, p=0.9), **Jaccard@K** y
+**Overlap@K**, por documento.
+
+| Métrica | TF-IDF | BB-IDF | p (pareado) | Cohen's d |
+|---|---|---|---|---|
+| RBO@10 | 0.401 | **0.459** | 0.0002 | +0.71 |
+| Jaccard@10 | 0.594 | **0.686** | 0.0003 | +0.86 |
+| Overlap@10 | 0.727 | **0.800** | 0.0006 | +0.78 |
+
+**BB-IDF es consistentemente más similar a TextRank que TF-IDF**, en todas las
+métricas y en todos los K (significativo en K ≥ 10, p < 0.005; en K = 5 solo RBO
+es significativo). Este resultado es coherente con la interpretación principal:
+al colapsar el IDF hacia casi-constante, BB-IDF se comporta como un ranking por
+frecuencia, más próximo al comportamiento de TextRank que al de TF-IDF.
+
 ## 17. Visualizaciones (`results/figures/`)
 
 1. `prf_at_k.png` — P/R/F1@K de los 3 algoritmos (valores anotados).
@@ -260,6 +279,7 @@ TextRank.
 9. `paired_diff_f1.png` — histograma de diferencias pareadas (BB-IDF − TF-IDF).
 10. `wordclouds.png` — **nubes de palabras** de cada algoritmo (score acumulado).
 11. `keyword_frequency.png` — top-20 términos más frecuentes en el Top-10 de cada algoritmo.
+12. `similarity_to_textrank.png` — similitud de ranking con TextRank (RBO) de TF-IDF vs BB-IDF.
 
 Las nubes de palabras (`wordclouds.png`) permiten la comparación cualitativa
 visual de qué términos prioriza cada método: TF-IDF tiende a términos
@@ -366,6 +386,10 @@ actuales, y debería revisarse antes de cualquier uso.
   algoritmo (`tfidf.csv`, `bbidf.csv`, `textrank.csv`, con score L2 + raw) y
   nube de palabras por algoritmo; `documents_index.csv` mapea `docX` al archivo
   original.
-- `results/figures/*.png` (11 figuras, incl. nubes de palabras y frecuencia).
+- `results/figures/*.png` (12 figuras, incl. nubes de palabras, frecuencia y
+  similitud con TextRank).
+- `results/processed/similarity_to_textrank.csv` y
+  `results/statistical/similarity_tests.csv` — análisis suplementario de
+  similitud de ranking con TextRank.
 - `results/benchmark/` — salida del benchmark computacional (`main.py`).
 - `results/metadata.json` — configuración reproducible.
