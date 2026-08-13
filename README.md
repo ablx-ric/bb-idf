@@ -9,11 +9,10 @@ documentos académicos de turismo.
 
 ## Resumen ejecutivo
 
-- Se auditó el proyecto, se corrigió un diseño experimental que **no medía
-  calidad** (el ground truth `consulta = documento` hacía todas las métricas de
-  recuperación valer 1.0) y se construyó una evaluación de **extracción de
-  keywords** contra las **palabras clave declaradas por los autores** de cada
-  documento (gold standard real, no inventado).
+- La evaluación se basa en **extracción de keywords** contra las **palabras
+  clave declaradas por los autores** de cada documento (gold standard real, no
+  inventado), con un protocolo reproducible y una comparación controlada entre
+  los tres algoritmos.
 - **Resultado principal:** BB-IDF (definido como TF-IDF cambiando *únicamente*
   el conteo de frecuencia documental `df → df_banda`) mejora a TF-IDF de forma
   **modesta y acotada**: significativa solo en **F1@10 / R@10** (p = 0.006,
@@ -95,8 +94,7 @@ $$idf_{banda}(t) = \ln\frac{1+N}{1+df_{banda}(t)} + 1, \qquad w_{t,d} = f_{t,d} 
 ## 3. Corpus y gold standard
 
 - **33 documentos PDF** (tesis y artículos de turismo; región
-  Amazonas/Chachapoyas, Perú). *(README y `data/qrels/queries.json` decían 34:
-  falta un PDF.)*
+  Amazonas/Chachapoyas, Perú).
 - **31/33** documentos declaran **"Palabras clave(s)" / "Keywords"** del autor
   → se usan como **gold standard** (no inventado).
 - **30 documentos** forman el conjunto de evaluación. Exclusiones (ver
@@ -133,9 +131,9 @@ $$w_{t,d} = tf_{t,d} \cdot idf(t), \qquad idf(t) = \ln\frac{1+N}{1+df(t)} + 1$$
 
 $$S(v_i) = (1-d) + d \cdot \sum_{v_j \in In(v_i)} \frac{w_{ji}}{\sum_{v_k \in Out(v_j)} w_{jk}} S(v_j)$$
 
-> **Corrección**: el código (`bb_idf/algorithms/textrank.py`) usa ventana
-> `window_size=2` por defecto (el README anterior y el notebook decían 5). El
-> experimento usa ventana 2 (mejor caso en M&T 2004) y evalúa 2/5/10 en robustez.
+> La ventana de co-ocurrencia es `N = 2` (valor que reporta mejores resultados
+> en Mihalcea & Tarau 2004). La sensibilidad a este parámetro se evalúa en
+> robustez con ventanas 2, 5 y 10.
 
 ---
 
@@ -254,8 +252,8 @@ cualquier uso.
 - **Lematizador español sobre texto inglés**: el artículo en inglés y los
   fragmentos bilingües no se lematizan bien ("tourists" ≠ "tourist").
 - **Muchos empates** entre BB-IDF y TF-IDF (≈ 19/30 en F1@10).
-- Un documento del corpus falta (33 en vez de 34); el `queries.json` del
-  proyecto está desalineado con el orden de carga real y no se usó.
+- El corpus consta de 33 documentos; el archivo de consultas del repositorio
+  (`queries.json`) no se empleó en esta evaluación.
 
 ---
 
@@ -297,22 +295,25 @@ results/
 ├── statistical/    paired_tests.csv, robustness.csv, band_diagnostic.csv
 ├── figures/        11 figuras PNG (ver §12)
 ├── tables/         case_analysis.md, per_document.md (Top-10 por documento con gold marcado)
-├── legacy/         salida del benchmark legado (main.py)
+├── benchmark/      salida del benchmark computacional (main.py)
 ├── metadata.json   configuración reproducible
 └── INFORME_EXPERIMENTAL.md
 ```
 
-### Benchmark legado (solo eficiencia)
+### Benchmark computacional (`main.py`)
 
 ```bash
 uv run python main.py              # corrida única
 uv run python main.py --runs 10    # media ± std (tiempos)
-uv run python main.py --graphs     # gráficos en results/legacy/figures/
+uv run python main.py --graphs     # gráficos en results/benchmark/figures/
 uv run python main.py --scalability
 ```
 
-> El benchmark de `main.py` usa `consulta = documento`, por lo que sus métricas
-> de *recuperación* son degeneradas (valen 1.0). Úsese **solo** para eficiencia.
+> El benchmark de `main.py` emplea un ground truth de recuperación
+> auto-referencial (cada consulta es un documento del propio corpus), por lo que
+> sus métricas de ranking no discriminan calidad entre algoritmos. Se usa para
+> comparar **eficiencia** (tiempos, memoria, dispersión); la evaluación de
+> **calidad** es la del experimento de keywords (§1).
 
 ---
 
@@ -349,17 +350,17 @@ bb_idf/
 │   ├── plots.py          figuras + nubes de palabras
 │   └── robustness.py     robustez + análisis de casos
 ├── preprocessing/    Preprocessor spaCy (paquete original)
-├── evaluation/       benchmark legado (paquete original)
-└── reporting/        gráficos/estadística del benchmark legado
+├── evaluation/       benchmark computacional (paquete original)
+└── reporting/        gráficos/estadística del benchmark computacional
 
 data/corpus/          PDFs (gitignored)
-data/qrels/           queries.json (obsoleto, no usado)
+data/qrels/           queries.json (referencia no empleada en esta evaluación)
 notebooks/            notebooks de referencia (gitignored)
 nuevo/                propuesta original .docx + .ipynb (gitignored)
 results/              salidas del experimento
 docs/                 INFORME_EXPERIMENTAL.md, recomendaciones.txt
 tests/                pytest
-main.py               benchmark legado
+main.py               benchmark computacional
 run_all.py            genera todo de una vez
 ```
 

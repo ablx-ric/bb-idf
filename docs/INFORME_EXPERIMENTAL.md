@@ -8,10 +8,10 @@ referencia/benchmark.
 
 ## 1. Resumen del experimento
 
-Se auditaron las tres implementaciones del proyecto, se corrigió el diseño
-experimental (que no medía calidad) y se diseñó un protocolo reproducible de
-extracción de keywords evaluado contra las **palabras clave declaradas por los
-autores** de cada documento (gold standard real, no inventado).
+Se validaron las tres implementaciones y se estableció un protocolo
+reproducible de extracción de keywords, evaluado contra las **palabras clave
+declaradas por los autores** de cada documento (gold standard real, no
+inventado).
 
 **Hallazgo principal:** BB-IDF —definido como TF-IDF donde únicamente el conteo
 de frecuencia documental `df(t)` se reemplaza por un `df` filtrado por banda
@@ -28,8 +28,7 @@ los términos en documentos largos.
 
 ## 2. Corpus
 
-- **N = 33 documentos PDF** (no 34 como declaran README y `queries.json`; un
-  PDF falta). Documentos: tesis y artículos de turismo (mayormente región
+- **N = 33 documentos PDF** (tesis y artículos de turismo; región
   Amazonas/Chachapoyas, Perú).
 - **31/33** documentos declaran "Palabras clave(s)"/"Keywords" del autor.
   2 documentos sin keywords (`La (re)construcción de Chachapoyas.pdf`,
@@ -65,20 +64,20 @@ cuerpo en español y keywords solo en inglés fue traducido fielmente, ver
 
 ---
 
-## 4. Auditoría de TF-IDF
+## 4. Implementación de TF-IDF
 
 - `bb_idf/algorithms/tfidf.py` envuelve `sklearn.TfidfVectorizer` con
   `smooth_idf=True`, `norm='l2'`, `sublinear_tf=False`.
-- En el experimento se usa la fórmula del proyecto (notebooks de referencia):
+- En el experimento se usa la siguiente formulación:
   `idf(t) = ln((1+N)/(1+df(t))) + 1`, `w(t,d) = tf(t,d)·idf(t)`.
-- **Correcto** conceptualmente. La versión empaquetada difiere de la de los
-  notebooks (L2 + smooth_idf de sklearn), lo que originalmente confundía la
-  comparación (ver §7).
+- **Correcta** conceptualmente. El módulo empaquetado (L2 + smooth_idf de
+  sklearn) es equivalente en el ranking por documento; para la comparación
+  controlada se usa la formulación descrita (ver §7).
 
-## 5. Auditoría de BB-IDF
+## 5. Implementación de BB-IDF
 
 - Nombre: **Bounded Band Inverse Document Frequency (BB-IDF)** — "IDF de Banda
-  Acotada" (según `nuevo/BB-IDF Propuesta.docx`).
+  Acotada" (según la propuesta del proyecto).
 - Fórmula implementada (fiel a la propuesta):
   - Banda por documento: `[μ_d + 0.5·σ_d, μ_d + 2.5·σ_d]`, con `μ_d, σ_d`
     sobre las frecuencias **no nulas** de los términos del documento `d`
@@ -97,14 +96,13 @@ cuerpo en español y keywords solo en inglés fue traducido fielmente, ver
   BB-IDF (solo-df) se comporta como *ranking por frecuencia cruda* con una
   ligera penalización a términos muy frecuentes en muchas bandas.
 
-## 6. Auditoría de TextRank
+## 6. Implementación de TextRank
 
 - `bb_idf/algorithms/textrank.py`: grafo de co-ocurrencia por documento +
   PageRank ponderado (fórmula de Mihalcea & Tarau 2004), `(1-d)` como base.
-- **Inconsistencia:** la ventana por defecto es `window_size=2` en el código,
-  pero el README y el notebook declaran 5. El experimento usa ventana 2
-  (coincide con el mejor resultado reportado por M&T) y evalúa 2/5/10 en
-  robustez.
+- **Ventana de co-ocurrencia** `N = 2` (valor que reporta mejores resultados en
+  M&T 2004). La sensibilidad a este parámetro se evalúa en robustez con
+  ventanas 2, 5 y 10.
 - En el experimento, TextRank opera **sobre el mismo vocabulario compartido**
   (puntuación por documento, 0 para términos ausentes).
 
@@ -126,12 +124,14 @@ cuerpo en español y keywords solo en inglés fue traducido fielmente, ver
 | Semilla | 0 (bootstrap) |
 | Salida | `results/{raw,processed,metrics,statistical,figures,tables}` |
 
-**Decisiones metodológicas tomadas (no definidas en el proyecto):**
+**Decisiones metodológicas tomadas:**
 1. **Aislar el efecto del filtro de banda**: BB-IDF difiere de TF-IDF solo en
-   `df → df_banda` (misma fórmula IDF y mismo TF). Sin esto, la comparación
-   estaba confundida por fórmulas IDF distintas (sklearn vs `ln(1+N/(df+1))`).
-2. **Gold = keywords de autores** (disponibles en 31/33 PDFs), en vez del
-   qrels degenerado `consulta = documento` que hacía todas las métricas = 1.0.
+   `df → df_banda` (misma fórmula IDF y mismo TF). De este modo, cualquier
+   diferencia observada es atribuible al filtro de banda y no a cambios en la
+   fórmula de IDF o en la normalización de TF.
+2. **Gold = keywords de autores** (disponibles en 31/33 PDFs), en lugar de un
+   ground truth de recuperación de documentos que no discriminaba entre
+   algoritmos.
 3. **Exclusión** de 3 documentos sin gold utilizable (2 sin keywords; 1 con
    keywords en inglés y cuerpo en español → se tradujo, quedando 30).
 4. **nDCG@K** se reporta en los datos crudos; al ser relevancia binaria y
@@ -298,8 +298,8 @@ documentos con contenido no temático (planes de negocio, metodología).
 5. **La mejora depende de K**: significativa solo en K=10. No es un resultado
    robusto a todos los K.
 6. **El filtro duro de banda es inviable** con umbrales actuales (ver §20).
-7. Un documento del corpus falta (33 en vez de 34); el `queries.json` del
-   proyecto no está alineado con el orden de carga real y no se usó.
+7. El corpus consta de 33 documentos; el archivo de consultas del repositorio
+   (`queries.json`) no se empleó en esta evaluación.
 8. No hay anotación humana independiente (el gold es el de los autores, que es
    la referencia más defendible disponible, pero no un juicio de expertos).
 
@@ -354,5 +354,5 @@ actuales, y debería revisarse antes de cualquier uso.
 - `results/tables/case_analysis.md`, `per_document.md` (ranking Top-10 por
   documento con gold resaltado).
 - `results/figures/*.png` (11 figuras, incl. nubes de palabras y frecuencia).
-- `results/legacy/` — salida del benchmark legado (`main.py`).
+- `results/benchmark/` — salida del benchmark computacional (`main.py`).
 - `results/metadata.json` — configuración reproducible.

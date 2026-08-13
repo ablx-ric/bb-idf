@@ -31,7 +31,7 @@ def main():
     args = parser.parse_args()
 
     corpus_dir = Path("data/corpus")
-    output_dir = Path("results/legacy")
+    output_dir = Path("results/benchmark")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Cargando documentos desde {corpus_dir} ...")
@@ -70,8 +70,8 @@ def main():
             pl.col("matrix_memory_kb").mean().round(2).alias("memory_kb_mean"),
         ]).sort("algorithm")
 
-        save_results(df_all, output_dir / "benchmark" / "benchmark_all_runs.csv")
-        save_results(df_summary, output_dir / "benchmark" / "benchmark_summary.csv")
+        save_results(df_all, output_dir / "benchmark_all_runs.csv")
+        save_results(df_summary, output_dir / "benchmark_summary.csv")
 
         print("\nResumen (media +/- std):")
         for row in df_summary.iter_rows(named=True):
@@ -115,7 +115,7 @@ def main():
         benchmark = Benchmark()
         vectorizers = _build_vectorizers()
         df = benchmark.run(documents, queries, vectorizers)
-        save_results(df, output_dir / "benchmark" / "benchmark.csv")
+        save_results(df, output_dir / "benchmark.csv")
 
         print("\nResultados:")
         headers = ["algoritmo", "vocab", "shape", "fit(s)", "transf(s)", "query(s)",
@@ -154,7 +154,7 @@ def main():
             kw_str = ", ".join(t for t, _ in res.keywords[0][:5])
             print(f"  {res.name:>8}: {kw_str}")
 
-        print(f"  Benchmark guardado: {output_dir / 'benchmark' / 'benchmark.csv'}")
+        print(f"  Benchmark guardado: {output_dir / 'benchmark.csv'}")
 
         if args.graphs:
             plot_all(benchmark.result.metrics, output_dir)
