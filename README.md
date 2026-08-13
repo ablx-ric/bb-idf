@@ -9,6 +9,21 @@ documentos académicos de turismo.
 
 ## Resumen ejecutivo
 
+### Respuestas directas (n = 30 documentos)
+
+1. **¿BB-IDF mejora a TF-IDF?** Sí, de forma **modesta y acotada a K = 10**:
+   F1@10 = 0.437 → 0.477 (+10.3%). En K = 5/20/50 y en AP/MRR no hay mejora
+   significativa; la mejora no es uniforme (gana 10/30, empata 19/30).
+2. **¿La mejora es estadísticamente significativa?** Sí en **F1@10 y R@10**
+   (p = 0.006), con tamaño de efecto **moderado** (Cohen's d = 0.56); P@10 es
+   marginal (p = 0.025). No significativa en el resto de configuraciones.
+3. **¿BB-IDF alcanza o supera a TextRank?** **Alcanza la paridad** (sin
+   diferencias significativas). Supera ligeramente en F1@10 (0.477 vs 0.467,
+   = 102% de TextRank), pero queda por debajo en AP (98%) y MRR (90%), a un
+   coste **~460× menor** que TextRank.
+
+### Resumen
+
 - La evaluación se basa en **extracción de keywords** contra las **palabras
   clave declaradas por los autores** de cada documento (gold standard real, no
   inventado), con un protocolo reproducible y una comparación controlada entre
@@ -16,10 +31,7 @@ documentos académicos de turismo.
 - **Resultado principal:** BB-IDF (definido como TF-IDF cambiando *únicamente*
   el conteo de frecuencia documental `df → df_banda`) mejora a TF-IDF de forma
   **modesta y acotada**: significativa solo en **F1@10 / R@10** (p = 0.006,
-  Cohen's d = 0.56, +10.3%). En K = 5, 20, 50 y en AP/MRR **no** hay diferencias
-  significativas.
-- **BB-IDF queda a la par de TextRank** (sin diferencias significativas; en
-  F1@10 lo iguala o supera ligeramente).
+  Cohen's d = 0.56, +10.3%).
 - **Hallazgo crítico:** la variante de BB-IDF con **filtro duro** de banda (la
   que implementa `bb_idf/algorithms/bbidf.py`) es **inviable** para extracción
   de keywords (F1@10 ≈ 0.04): los umbrales de banda sobre conteos crudos anulan
@@ -27,8 +39,7 @@ documentos académicos de turismo.
 - **Costo:** BB-IDF cuesta ~2× TF-IDF y ~3 órdenes de magnitud menos que
   TextRank.
 - **Alcance honesto:** con n = 30 documentos, la conclusión es exploratoria;
-  la mejora es real pero **no uniforme** (BB-IDF gana en 10/30, empata en
-  19/30) y **depende de K**.
+  la mejora es real pero **no uniforme** y **depende de K**.
 
 ---
 
