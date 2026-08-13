@@ -200,6 +200,13 @@ $$S(v_i) = (1-d) + d \cdot \sum_{v_j \in In(v_i)} \frac{w_{ji}}{\sum_{v_k \in Ou
 
 ## 7. Métricas
 
+**Definición de `K`.** `K` es el número de palabras clave que se extraen **de
+cada documento** (el "Top-K"). **No** se refiere al número de documentos del
+corpus (ese es `N = 33`). Cada algoritmo ordena las palabras del documento por
+score descendente y se queda con las primeras `K`. Se evalúa K ∈ {5, 10, 20,
+50}; como el gold tiene en promedio ~6.5 keywords por documento, **K = 10** es
+el valor más relevante y es el desenlace primario del experimento.
+
 - **P@K**: fracción del Top-K que es keyword de autor.
 - **R@K**: fracción de keywords de autor recuperadas en el Top-K.
 - **F1@K**: media armónica de P@K y R@K.

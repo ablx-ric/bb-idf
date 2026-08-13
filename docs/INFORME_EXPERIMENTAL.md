@@ -141,6 +141,12 @@ cuerpo en español y keywords solo en inglés fue traducido fielmente, ver
 
 ## 8. Métricas utilizadas
 
+**Definición de `K`.** `K` es el número de palabras clave extraídas **por
+documento** (Top-K). No se refiere al número de documentos (N = 33). Cada
+algoritmo ordena los términos del documento por score descendente y conserva los
+primeros `K`. Se evalúa K ∈ {5, 10, 20, 50}; dado que el gold tiene en promedio
+~6.5 keywords por documento, K = 10 es el desenlace primario.
+
 - **P@K**: fracción del Top-K que es keyword de autor.
 - **R@K**: fracción de keywords de autor recuperadas en el Top-K.
 - **F1@K**: media armónica de P@K y R@K.
