@@ -240,15 +240,22 @@ TextRank.
 
 ## 17. Visualizaciones (`results/figures/`)
 
-1. `prf_at_k.png` — P/R/F1@K de los 3 algoritmos.
-2. `f1_comparison.png` — barras F1@K.
-3. `improvement_bbidf.png` — mejora % de BB-IDF vs TF-IDF (con error estándar).
-4. `per_doc_boxplot.png` — distribución por documento (F1@10, AP).
-5. `efficiency.png` — tiempo total y por documento.
+1. `prf_at_k.png` — P/R/F1@K de los 3 algoritmos (valores anotados).
+2. `f1_comparison.png` — barras F1@K (valores anotados).
+3. `improvement_bbidf.png` — mejora % de BB-IDF vs TF-IDF (media ± SE).
+4. `per_doc_boxplot.png` — distribución por documento (F1@10, AP) con puntos individuales.
+5. `efficiency.png` — tiempo total y por documento (valores anotados).
 6. `quality_time_tradeoff.png` — F1@10 vs tiempo (escala log).
-7. `heatmap_f1_doc.png` — F1@10 por documento × algoritmo.
+7. `heatmap_f1_doc.png` — F1@10 por documento × algoritmo (valores en celdas).
 8. `f1_with_ci.png` — medias F1@K con IC 95%.
 9. `paired_diff_f1.png` — histograma de diferencias pareadas (BB-IDF − TF-IDF).
+10. `wordclouds.png` — **nubes de palabras** de cada algoritmo (score acumulado).
+11. `keyword_frequency.png` — top-20 términos más frecuentes en el Top-10 de cada algoritmo.
+
+Las nubes de palabras (`wordclouds.png`) permiten la comparación cualitativa
+visual de qué términos prioriza cada método: TF-IDF tiende a términos
+discriminativos/raros, mientras BB-IDF y TextRank favorecen términos frecuentes
+más alineados con las keywords de los autores.
 
 ---
 
