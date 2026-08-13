@@ -1,8 +1,11 @@
 # bb-idf
 
-Comparacion de algoritmos de ponderacion de terminos (TF-IDF, TextRank, BB-IDF) para recuperacion de informacion en espanol.
+Evaluación científica de algoritmos de extracción de keywords sobre un corpus
+de documentos académicos de turismo. Compara **TF-IDF**, **BB-IDF** (propuesta)
+y **TextRank** (referencia/benchmark), tanto en **calidad** (contra las palabras
+clave declaradas por los autores) como en **costo computacional**.
 
-## Instalacion
+## Instalación
 
 ```bash
 uv sync
@@ -11,272 +14,175 @@ python -m spacy download es_core_news_sm
 
 ## Uso
 
+Hay dos vías de ejecución:
+
+### 1. Evaluación de extracción de keywords (principal)
+
 ```bash
-# Benchmark simple (34 docs, corrida unica)
-uv run python main.py
+# Métricas por documento/algoritmo/K + estadística + eficiencia
+uv run python -m bb_idf.experiment.run
 
-# Multi-run con media +/- desviacion y analisis estadistico
-uv run python main.py --runs 10
+# Figuras científicas (results/figures/)
+uv run python -m bb_idf.experiment.plots
 
-# Generar graficos (15 graficos en output/figures/)
-uv run python main.py --graphs
+# Robustez (ventana de TextRank, variante de banda dura, diagnóstico) + casos
+uv run python -m bb_idf.experiment.robustness
+```
 
-# Prueba de escalabilidad (subconjuntos de 5,10,20,34 docs)
+Estructura de salida:
+
+```
+results/
+├── raw/            per_doc_metrics.csv, doc_info.csv
+├── processed/      summary.csv, improvement_bbidf_vs_tfidf.csv, gap_to_textrank.csv
+├── metrics/        top10_keywords.csv, keywords_ranked.csv
+├── statistical/    paired_tests.csv, robustness.csv, band_diagnostic.csv
+├── figures/        9 figuras PNG
+├── tables/         case_analysis.md
+├── metadata.json   configuración reproducible
+└── INFORME_EXPERIMENTAL.md
+```
+
+### 2. Benchmark legado (solo eficiencia)
+
+```bash
+uv run python main.py              # corrida única
+uv run python main.py --runs 10    # media +/- std (tiempos)
+uv run python main.py --graphs     # 15 gráficos en output/figures/
 uv run python main.py --scalability
-
-# Combinar flags
-uv run python main.py --runs 10 --graphs --scalability
 ```
 
-### Estructura de output
+> **Nota metodológica**: el benchmark de `main.py` usa `consulta = documento`
+> (cada consulta es idéntica a un documento y solo ese documento es relevante),
+> por lo que sus métricas de *recuperación* (P@k, MAP, MRR, nDCG) son
+> degeneradas (valen 1.0 para los tres algoritmos). Úsese solo para comparar
+> **eficiencia** (tiempos, memoria, dispersión). La evaluación de **calidad**
+> es la del experimento de keywords (§1).
 
-```
-output/
-├── benchmark/
-│   ├── benchmark.csv              # Resultados corrida unica
-│   ├── benchmark_all_runs.csv      # Resultados multi-run (raw)
-│   └── benchmark_summary.csv       # Media +/- std por algoritmo
-├── figures/
-│   ├── benchmark_fit_time.png      # Tiempo de ajuste
-│   ├── ...                         # (15 graficos, ver seccion)
-└── metrics/
-    ├── scalability.csv             # Tiempos por tamano de corpus
-    ├── statistical_analysis.txt    # ANOVA + post-hoc
-    ├── tfidf_metrics.csv           # Matriz de similitud
-    ├── textrank_metrics.csv
-    └── bbidf_metrics.csv
-```
+## Corpus
+
+- **33 documentos PDF** (tesis y artículos de turismo; región Amazonas/Chachapoyas, Perú).
+  *(El README y `data/qrels/queries.json` decían 34: falta un PDF.)*
+- 31/33 documentos declaran **"Palabras clave(s)" / "Keywords"** del autor →
+  se usan como **gold standard** (no inventado).
+- 30 documentos forman el conjunto de evaluación (3 excluidos sin keywords
+  utilizables). Ver `bb_idf/experiment/gold.py`.
+
+## Preprocesamiento (idéntico para los 3 algoritmos y el gold)
+
+1. Extracción de texto: PyMuPDF (`fitz`).
+2. Tokenización + lematización: spaCy `es_core_news_sm` (sin parser/ner), `lemma_.lower()`.
+3. Filtros: sin puntuación/espacios, sin stopwords (ES + mínima lista EN por el
+   contenido bilingüe), sin tokens numéricos (`like_num`), **lema alfabético**
+   (`isalpha`, elimina ISSN/DOI/URLs), longitud ≥ 3.
+4. **Vocabulario compartido** (unión de los 33 docs) y **matriz de conteos
+   compartida**: los tres algoritmos operan sobre el mismo espacio de términos.
+
+El gold se normaliza con el mismo pipeline y se aplana a unigramas de contenido.
 
 ## Algoritmos
 
 ### TF-IDF
 
-Implementacion mediante `TfidfVectorizer` de scikit-learn. Ponderacion classica:
-
-$$w_{t,d} = tf_{t,d} \cdot \log\frac{N}{df_t}$$
+$$w_{t,d} = tf_{t,d} \cdot idf(t), \qquad idf(t) = \ln\frac{1+N}{1+df(t)} + 1$$
 
 ### TextRank
 
-Implementacion propia basada en Mihalcea & Tarau (2004). Construye un grafo de co-ocurrencia de terminos (ventana deslizante de tamanio 5) y ejecuta PageRank iterativo hasta convergencia:
+Grafo de co-ocurrencia por documento + PageRank ponderado (Mihalcea & Tarau 2004):
 
 $$S(v_i) = (1-d) + d \cdot \sum_{v_j \in In(v_i)} \frac{w_{ji}}{\sum_{v_k \in Out(v_j)} w_{jk}} S(v_j)$$
 
-### BB-IDF (Propuesta)
-
-**Bounded Band Inverse Document Frequency** — evolucion del TF-IDF que introduce un **filtro de banda estadistico adaptativo por documento**. En lugar de contar un documento para el DF con una sola mencion del termino, BB-IDF exige que la frecuencia del termino caiga dentro de una banda estadistica especifica de ese documento.
-
-#### Componentes
-
-- **Banda inferior** ($\mu_d + 0.5\sigma_d$): Filtra **ruido** — terminos que aparecen muy pocas veces en el documento. Una mencion aislada no implica que el documento trate sobre ese tema.
-- **Banda superior** ($\mu_d + 2.5\sigma_d$): Filtra **spam** (keyword stuffing) y stop words — terminos que aparecen excesivamente (ej. "el", "de" en documentos grandes).
-- **Fallback para docs cortos** (< 30 tokens): Banda fija $[1.5, 4.5]$ para documentos pequenos donde la distribucion estadistica no es confiable.
-
-#### Formulas
-
-Para cada documento $d$ con frecuencias $f_{t,d}$ y $\mu_d, \sigma_d$ calculados sobre los terminos presentes en $d$:
-
-$$banda_d = [\mu_d + 0.5\sigma_d,\; \mu_d + 2.5\sigma_d]$$
-
-El conteo de documentos filtrado por banda:
-
-$$df_{banda}(t) = |\{ d : f_{t,d} \in banda_d \}|$$
-
-$$BB\text{-}IDF(t) = \log\left(1 + \frac{N}{df_{banda}(t) + 1}\right)$$
-
-$$w_{t,d} = f_{t,d} \cdot BB\text{-}IDF(t)$$
-
-## Metodologia de Benchmark
-
-### Pipeline
-
-```
-PDFs (34 docs)
-  → extraccion de texto (pymupdf)
-  → preprocesamiento (spaCy: lematizacion + stopwords ES)
-  → fit_transform (cada algoritmo genera matriz term-documento)
-  → transform (5 consultas = primeros 5 docs)
-  → similitud coseno entre consultas y documentos
-  → ranking descendente por similitud
-  → calculo de metricas de recuperacion
-```
-
-### Relevancia (ground truth)
-
-Cada consulta $q_i$ tiene como unico documento relevante a $d_i$ (el mismo indice). Esto implica que las metricas de recuperacion (MAP, MRR, Precision@k, Recall@k, nDCG@k) miden que tan bien cada algoritmo **reconstruye la identidad del documento original**, no su capacidad de recuperacion general. Con esta configuracion, los 3 algoritmos producen metricas identicas (ver seccion correspondiente).
-
-## Definicion de Metricas
-
-### Tiempo de ajuste (`fit_time`)
-
-Tiempo que tarda cada algoritmo en construir el vocabulario y la matriz term-documento a partir de los 34 documentos preprocesados. Fundamental para comparar eficiencia.
-
-### Tiempo de transformacion (`transform_time`)
-
-Tiempo que tarda en vectorizar las 5 consultas usando el vocabulario ya aprendido. Refleja el costo de inferencia.
-
-### Tiempo de consulta (`query_time`)
-
-Tiempo que tarda en calcular la matriz de similitud coseno $Q \cdot D^T$ (5 consultas $\times$ 34 documentos) y generar el ranking.
-
-### Sparsity y Density
-
-- **Sparsity**: $1 - \frac{nnz}{total\_cells}$. Fraccion de celdas con valor cero.
-- **Density**: $\frac{nnz}{total\_cells}$. Fraccion de celdas con valor distinto de cero.
-
-Matrices mas densas implican que cada termino aparece en mas documentos.
-
-### Memoria de matriz (`matrix_memory_kb`)
-
-$D.nbytes / 1024$. Tamanio en memoria de la matriz term-documento densa (numpy array).
-
-### Precision@k
-
-$$P@k = \frac{|relevant \cap retrieved_k|}{k}$$
-
-Fraccion de documentos relevantes entre los primeros $k$ recuperados.
-
-### Recall@k
-
-$$R@k = \frac{|relevant \cap retrieved_k|}{|relevant|}$$
-
-Fraccion de documentos relevantes recuperados entre los primeros $k$.
-
-### nDCG@k
-
-$$DCG_k = \sum_{i=1}^{k} \frac{rel_i}{\log_2(i+1)}$$
-$$nDCG_k = \frac{DCG_k}{IDCG_k}$$
-
-Mide la calidad del ranking ponderando por posicion. Con un solo relevante en posicion 1, $nDCG@k = 1.0$.
-
-### MAP (Mean Average Precision)
-
-$$AP = \frac{1}{|relevant|} \sum_{k=1}^{|relevant|} P@k \cdot rel_k$$
-$$MAP = \frac{1}{|Q|} \sum_{q \in Q} AP_q$$
-
-Promedio de la precision en cada posicion donde aparece un relevante.
-
-### MRR (Mean Reciprocal Rank)
-
-$$MRR = \frac{1}{|Q|} \sum_{q \in Q} \frac{1}{rank_q}$$
-
-Inversa del rango del primer relevante. Con relevante en posicion 1, $MRR = 1.0$.
-
-## Resultados
-
-### Tiempo de ajuste (10 corridas)
-
-| Algoritmo | Media (s) | Std (s) |
-|-----------|-----------|---------|
-| TF-IDF | 0.2557 | 0.0123 |
-| BB-IDF | 0.9431 | 0.0376 |
-| TextRank | 6.4596 | 0.0504 |
-
-TextRank es ~25x mas lento que TF-IDF y ~7x mas lento que BB-IDF. BB-IDF es ~3.7x mas lento que TF-IDF (costo del filtro de banda).
-
-### Tiempo de transformacion (10 corridas)
-
-| Algoritmo | Media (s) | Std (s) |
-|-----------|-----------|---------|
-| TF-IDF | 0.0303 | 0.0019 |
-| BB-IDF | 0.0593 | 0.0018 |
-| TextRank | 1.0346 | 0.0185 |
-
-TextRank es ~34x mas lento en inferencia que TF-IDF. BB-IDF es ~2x mas lento que TF-IDF por el calculo de banda y filtro en transform.
-
-### Sparsity y Memoria
-
-| Algoritmo | Vocab | Sparsity | Memoria (KB) |
-|-----------|-------|----------|--------------|
-| TF-IDF | 21,330 | 0.9092 | 5,665.78 |
-| BB-IDF | 21,330 | **0.9938** | 5,665.78 |
-| TextRank | 24,636 | 0.9181 | 6,543.94 |
-
-BB-IDF produce la matriz mas dispersa (99.38% ceros) gracias al filtro de banda que anula terminos fuera del rango [1.5, 4.5] en docs cortos o fuera de la banda estadistica en docs largos. TextRank genera un vocabulario ~15% mayor.
-
-### Metricas de recuperacion
-
-| Algoritmo | P@5 | R@5 | nDCG@5 | MAP | MRR |
-|-----------|-----|-----|--------|-----|-----|
-| TF-IDF | 0.200 | 1.000 | 1.000 | 1.000 | 1.000 |
-| TextRank | 0.200 | 1.000 | 1.000 | 1.000 | 1.000 |
-| BB-IDF | 0.200 | 1.000 | 1.000 | 1.000 | 1.000 |
-
-Identicos. Ver seccion de metricas identicas.
-
-### Escalabilidad
-
-| n_docs | TF-IDF (s) | TextRank (s) | BB-IDF (s) |
-|--------|------------|--------------|------------|
-| 5 | 0.0367 | 1.0165 | 0.1012 |
-| 10 | 0.0571 | 1.4310 | 0.1850 |
-| 20 | 0.1222 | 3.1240 | 0.4563 |
-| 34 | 0.2437 | 6.4476 | 0.9056 |
-
-TF-IDF y BB-IDF escalan linealmente con el numero de documentos ($R^2 \approx 0.99$). TextRank tiene crecimiento super-lineal ($R^2 \approx 0.99$ en escala cuadratica) por la construccion del grafo de co-ocurrencia.
-
-### Analisis estadistico (10 corridas)
-
-- **Normalidad**: BB-IDF (W=0.659, p=0.000, no normal), TextRank (W=0.891, p=0.174, normal), TF-IDF (W=0.621, p=0.000, no normal)
-- **Kruskal-Wallis**: $H = 25.81$, $p < 0.001$ (diferencias altamente significativas)
-- **Post-hoc (Mann-Whitney + Cohen's d)**:
-  - BB-IDF vs TextRank: $U=0$, $p=0.0002$, $d=-124.10$
-  - BB-IDF vs TF-IDF: $U=100$, $p=0.0002$, $d=24.56$
-  - TextRank vs TF-IDF: $U=100$, $p=0.0002$, $d=169.21$
-
-Todas las diferencias son significativas ($p < 0.001$). Los tamanos del efecto (Cohen's d) son extremadamente grandes ($|d| > 24$) en todos los pares, confirmando que los 3 algoritmos tienen rendimientos fundamentalmente distintos en tiempo de ejecucion. Con 10 corridas, BB-IDF y TF-IDF muestran distribuciones no-normales (sesgadas hacia la derecha), requiriendo Kruskal-Wallis en lugar de ANOVA.
-
-## Keywords
-
-Para cada documento se extraen los top-5 terminos con mayor peso, exportados a `output/metrics/{algo}_keywords.csv`. Los pesos se normalizan con **L2-normalizacion** por documento ($\frac{w_{t,d}}{\| \mathbf{w}_d \|_2}$) para que los scores sean comparables entre algoritmos en escala $[0, 1]$:
-
-$$w_{t,d}^{norm} = \frac{w_{t,d}}{\sqrt{\sum_{t'} w_{t',d}^2}}$$
-
-Adicionalmente se generan nubes de palabras (`wordcloud_{algo}.png`) y un grafico de frecuencia (`keyword_frequency.png`) con los 20 terminos que mas aparecen en el top-5 entre todos los documentos.
-
-### Preprocesamiento de keywords
-
-El pipeline de preprocesamiento aplica los siguientes filtros para evitar artefactos en el top-5:
-
-- **Stopwords**: removidas via spaCy `token.is_stop`
-- **Numeros**: excluidos via `token.like_num` (evita que anos, cifras y codigos dominen el ranking)
-- **Tokens cortos**: excluidos con `len(token) < 3` (elimina fragmentos, siglas de una letra, etc.)
-- **Signos de puntuacion y espacios**: excluidos via `token.is_punct / is_space`
-
-## Graficos
-
-### Informativos (diferencian algoritmos)
-
-| Grafico | Descripcion |
-|---------|-------------|
-| `benchmark_fit_time.png` | Tiempo de ajuste por algoritmo. TextRank domina el grafico (~7.3s vs ~0.3-0.6s). |
-| `benchmark_transform_time.png` | Tiempo de transformacion. TextRank nuevamente ~30x mas lento. |
-| `benchmark_query_time.png` | Tiempo de consulta (similitud coseno). Similar para los 3. |
-| `benchmark_vocab_size.png` | Tamanio del vocabulario generado por cada algoritmo. |
-| `benchmark_panel_times.png` | Panel combinado con fit_time + vocab_size. |
-| `benchmark_sparsity_density.png` | Sparsity y density de cada matriz. |
-| `benchmark_memory.png` | Memoria de matriz y peso serializado. |
-| `similarity_{algo}.png` | Heatmap de similitud coseno (5 consultas x 34 docs). Revela diferencias en la distribucion de similitudes. |
-| `weight_distribution_{algo}.png` | Histograma + boxplot de la distribucion de pesos. Muestra como cada algoritmo distribuye los valores. |
-
-### Identicos para los 3 algoritmos
-
-| Grafico | Explicacion |
-|---------|-------------|
-| `precision_at_k.png` | P@k = {1.0, 1.0, 0.2, 0.2} para k={1,3,5,10}. Identico porque la consulta $q_i$ es el documento $d_i$, y $sim(d_i, d_i) = 1.0$ para los 3 algoritmos. El relevante siempre aparece en rank 1. |
-| `recall_at_k.png` | R@k = 1.0 para todo k >= 1 por la misma razon: el unico relevante siempre se recupera. |
-| `ndcg_at_k.png` | nDCG@k = 1.0 porque el relevante esta en posicion 1 (DCG = IDCG). |
-| `mean_average_precision.png` | MAP = 1.0 porque precision en la unica posicion relevante (rank 1) es 1.0. |
-| `mean_reciprocal_rank.png` | MRR = 1.0 porque el primer relevante siempre esta en rank 1. |
-| `ranking_panel.png` | Panel combinado MAP + MRR, ambos 1.0. |
-
-**Nota**: Estas metricas serian diferentes entre algoritmos si se usaran juicios de relevancia externos (ej. consultas fuera del corpus, evaluacion por un experto). Con la configuracion actual (query = doc), solo miden consistencia interna.
-
-## Graficos que desestimamos
-
-Los 6 graficos de metricas de recuperacion (`precision_at_k`, `recall_at_k`, `ndcg_at_k`, `mean_average_precision`, `mean_reciprocal_rank`, `ranking_panel`) muestran valores identicos para los 3 algoritmos debido al diseno del ground truth artificial. Se mantienen en el codigo para uso futuro con juicios de relevancia reales, pero los consideramos no informativos en la evaluacion actual.
+> **Corrección**: el código (`bb_idf/algorithms/textrank.py`) usa ventana
+> `window_size=2` por defecto; el README anterior y el notebook decían 5. El
+> experimento usa ventana 2 (mejor caso reportado en M&T 2004) y evalúa 2/5/10
+> en robustez.
+
+### BB-IDF (Bounded Band Inverse Document Frequency)
+
+Evolución del TF-IDF que introduce un **filtro de banda estadístico adaptativo
+por documento** en el conteo de la frecuencia documental.
+
+- Banda: $[\,\mu_d + 0.5\sigma_d,\; \mu_d + 2.5\sigma_d\,]$, con $\mu_d, \sigma_d$
+  sobre las frecuencias no nulas del documento `d` (σ poblacional).
+- Fallback `[1.5, 4.5]` si `banda_inf ≥ banda_sup` o el doc tiene < 30 tokens.
+- $df_{banda}(t) = |\{d : banda\_inf_d \le f_{t,d} \le banda\_sup_d\}|$.
+- $w_{t,d} = tf_{t,d} \cdot idf_{banda}(t)$, con la **misma** fórmula IDF que
+  TF-IDF ($idf_{banda} = \ln\frac{1+N}{1+df_{banda}(t)} + 1$).
+
+**Variantes consideradas** (ver `bb_idf/experiment/scorers.py`):
+
+| Variante | Definición | Resultado |
+|---|---|---|
+| `bbidf` (principal) | solo cambia `df → df_banda` | comparable a TF-IDF, iguala a TextRank |
+| `bbidf_hard_band` | además anula pesos fuera de banda (como `bb_idf/algorithms/bbidf.py`) | **inviable** en docs largos (F1@10 ≈ 0.04) |
+
+## Protocolo experimental
+
+| Elemento | Valor |
+|---|---|
+| Unidad experimental | documento (n = 30 evaluables) |
+| K | 5, 10, 20, 50 |
+| Métricas | P@K, R@K, F1@K, AP, MRR, nDCG@K |
+| Comparación principal | BB-IDF vs TF-IDF (pareada por documento) |
+| Comparación secundaria | BB-IDF / TF-IDF vs TextRank |
+| Estadística | Wilcoxon signed-rank, bootstrap CI 95%, Cohen's d (pareado), rank-biserial |
+
+## Resultados principales
+
+Media F1@K y ranking (30 documentos):
+
+| Métrica | TF-IDF | BB-IDF | TextRank |
+|---|---|---|---|
+| F1@5 | 0.432 | 0.442 | **0.455** |
+| F1@10 | 0.437 | **0.477** | 0.467 |
+| F1@20 | 0.348 | 0.347 | 0.349 |
+| F1@50 | 0.190 | 0.190 | 0.185 |
+| AP | 0.488 | 0.500 | **0.508** |
+| MRR | 0.741 | 0.747 | **0.828** |
+
+Mejora de BB-IDF sobre TF-IDF (F1@K):
+
+| K | Mejora media | p (Wilcoxon) | Cohen's d |
+|---|---|---|---|
+| 5 | +3.4% | 0.266 | +0.10 |
+| **10** | **+10.3%** | **0.006** | **+0.56** |
+| 20 | −0.9% | 0.750 | −0.04 |
+| 50 | +0.5% | 0.625 | +0.02 |
+
+Eficiencia (33 docs, sin preprocesado):
+
+| Algoritmo | Tiempo total | Tiempo/doc | Factor vs TF-IDF |
+|---|---|---|---|
+| TF-IDF | 0.0042 s | 0.00013 s | 1× |
+| BB-IDF | 0.0089 s | 0.00027 s | 2.1× |
+| TextRank | 4.117 s | 0.125 s | ~980× |
+
+## Hallazgos clave
+
+1. **BB-IDF mejora a TF-IDF de forma modesta y acotada**: significativa solo en
+   **F1@10 / R@10** (p = 0.006, d = 0.56). No significativa en K = 5, 20, 50 ni
+   en AP/MRR. La mejora no es uniforme (gana en 10/30, empata en 19/30).
+2. **BB-IDF está a la par de TextRank** (sin diferencias significativas; en
+   F1@10 lo iguala o supera ligeramente).
+3. **El filtro de banda con umbrales sobre conteos crudos colapsa el IDF**: el
+   91% de los términos tienen `df_banda = 0` (correlación IDF clásico/banda =
+   0.59), por lo que BB-IDF (solo-df) se comporta como un ranking por
+   frecuencia con penalización selectiva.
+4. **La variante con filtro duro** (la implementada en
+   `bb_idf/algorithms/bbidf.py`) anula ~91% de términos y es inviable para
+   extracción de keywords (F1@10 ≈ 0.04).
+5. El benchmark legado (`main.py`) no mide calidad (ground truth degenerado);
+   véase §2.
+
+## Limitaciones (n = 30)
+
+- Potencia limitada; conclusiones exploratorias.
+- Gold de unigramas (los algoritmos son unigrama; no se evalúan frases completas).
+- Lematizador español sobre el artículo en inglés y fragmentos bilingües.
+- Muchos empates entre BB-IDF y TF-IDF (≈ 19/30 en F1@10).
 
 ## Referencias
 
-- Mihalcea, R., & Tarau, P. (2004). TextRank: Bringing Order into Text. *Proceedings of EMNLP*.
-- Ramos, J. (2003). Using TF-IDF to Determine Word Relevance in Document Queries. *Proceedings of the First Instructional Conference on Machine Learning*.
+- Mihalcea, R., & Tarau, P. (2004). TextRank: Bringing Order into Text. *EMNLP*.
+- Ramos, J. (2003). Using TF-IDF to Determine Word Relevance in Document Queries. *ICML*.
 - Pedregosa, F. et al. (2011). Scikit-learn: Machine Learning in Python. *JMLR*, 12, 2825-2830.

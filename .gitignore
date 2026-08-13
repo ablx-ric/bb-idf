@@ -18,4 +18,5 @@ data/processed/
 data/results/
 data/corpus/*.pdf
 nuevo/
-nuevo/
+data/
+notebooks/
