@@ -19,20 +19,20 @@
     "bbidf",
     "textrank"
   ],
-  "preprocessing": "spaCy es_core_news_sm: lemma.lower(); filter punct/space/stop/like_num/len>=3",
+  "preprocessing": "spaCy es_core_news_sm: lemma.lower(); filter punct/space/stop(ES+EN)/like_num/len>=3/lemma.isalpha",
   "idf_formula": "ln((1+N)/(1+df)) + 1",
   "bbidf_band": "mu + 0.5*sigma / mu + 2.5*sigma over nonzero freqs; fallback [1.5,4.5] if band_inf>=band_sup or n_tokens<30",
   "bbidf_change_vs_tfidf": "df -> df_banda only (no hard zeroing of weights)",
   "seed": 0,
-  "prep_time_s": 5.3528,
+  "prep_time_s": 5.3092,
   "fit_time_s": {
-    "tfidf": 0.0044,
-    "bbidf": 0.0079,
-    "textrank": 4.0552
+    "tfidf": 0.0043,
+    "bbidf": 0.0083,
+    "textrank": 3.9751
   },
   "per_doc_time_s": {
-    "tfidf": 0.000134,
-    "bbidf": 0.000239,
-    "textrank": 0.122885
+    "tfidf": 0.00013,
+    "bbidf": 0.000251,
+    "textrank": 0.120457
   }
 }

@@ -93,11 +93,11 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
                    "n_tokens": len(docs_tokens[d]), "n_gold": len(gold)}
             row.update(ev)
             rows.append(row)
-            ranked = metrics_module.ranked_terms(weights[name][d], vocab)
-            for rank, term in enumerate(ranked[:max(ks)], start=1):
+            ranked = metrics_module.ranked_terms_with_scores(weights[name][d], vocab)
+            for rank, (term, score) in enumerate(ranked[:max(ks)], start=1):
                 keyword_rows.append({
                     "doc_id": d, "algorithm": name, "rank": rank, "term": term,
-                    "in_gold": term in gold,
+                    "score": round(score, 6), "in_gold": term in gold,
                 })
 
     df = pl.DataFrame(rows)
@@ -107,6 +107,72 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
     kw_df.write_csv(output_dir / "metrics" / "keywords_ranked.csv")
 
     pl.DataFrame(doc_rows).write_csv(output_dir / "raw" / "doc_info.csv")
+
+    # ---- Per-document wide table (one row per document) ----
+    wide_cols = []
+    for k in ks:
+        wide_cols += [f"F1@{k}"]
+    wide_cols += ["AP", "MRR"]
+    by_doc: dict[int, dict] = {}
+    for row in rows:
+        d = row["doc_id"]
+        if d not in by_doc:
+            by_doc[d] = {
+                "doc_id": d, "file": row["file"],
+                "n_tokens": row["n_tokens"], "n_gold": row["n_gold"],
+                "gold": ", ".join(sorted(gold_sets[d])),
+            }
+        algo = row["algorithm"]
+        for m in wide_cols:
+            by_doc[d][f"{algo}_{m}"] = row[m]
+    wide_rows = []
+    for d in sorted(by_doc):
+        r = by_doc[d]
+        base = r.get("tfidf_F1@10", 0.0)
+        bb = r.get("bbidf_F1@10", 0.0)
+        r["improvement_F1@10_pct"] = round(((bb - base) / base) * 100.0, 2) if base != 0 else None
+        wide_rows.append(r)
+    pl.DataFrame(wide_rows).write_csv(output_dir / "processed" / "per_doc_wide.csv")
+
+    # ---- Per-document keyword overview (markdown) ----
+    top10: dict[int, dict[str, list[tuple[str, float]]]] = {}
+    for d in range(n_docs):
+        if d in excluded:
+            continue
+        top10[d] = {}
+        for name in ALGORITHMS:
+            top10[d][name] = metrics_module.ranked_terms_with_scores(
+                weights[name][d], vocab, k=10)
+
+    md_lines = ["# Keywords por documento (Top-10)", ""]
+    md_lines.append("`*` = término presente en el gold standard (autor).")
+    md_lines.append("")
+    for d in sorted(top10):
+        md_lines.append(f"## Doc {d} — {documents[d][0]}")
+        md_lines.append("")
+        md_lines.append(f"- **Gold (autor)**: {', '.join(sorted(gold_sets[d]))}")
+        f1s = {name: round(metrics_module.evaluate_document(
+            weights[name][d], vocab, gold_sets[d], ks)["F1@10"], 3)
+               for name in ALGORITHMS}
+        md_lines.append(
+            f"- **F1@10**: TF-IDF={f1s['tfidf']} | BB-IDF={f1s['bbidf']} | "
+            f"TextRank={f1s['textrank']}")
+        md_lines.append("")
+        md_lines.append("| # | TF-IDF | BB-IDF | TextRank |")
+        md_lines.append("|---|--------|--------|----------|")
+        for r in range(10):
+            cells = []
+            for name in ALGORITHMS:
+                if r < len(top10[d][name]):
+                    term, score = top10[d][name][r]
+                    mark = "*" if term in gold_sets[d] else ""
+                    cells.append(f"{term}{mark} ({score:.3f})")
+                else:
+                    cells.append("—")
+            md_lines.append(f"| {r + 1} | {' | '.join(cells)} |")
+        md_lines.append("")
+    (output_dir / "tables" / "per_document.md").write_text(
+        "\n".join(md_lines), encoding="utf-8")
 
     # ---- Aggregate per metric per K per algorithm ----
     metric_cols = []
@@ -195,7 +261,7 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
         "ks": ks,
         "textrank_window": textrank_window,
         "algorithms": ALGORITHMS,
-        "preprocessing": "spaCy es_core_news_sm: lemma.lower(); filter punct/space/stop/like_num/len>=3",
+        "preprocessing": "spaCy es_core_news_sm: lemma.lower(); filter punct/space/stop(ES+EN)/like_num/len>=3/lemma.isalpha",
         "idf_formula": "ln((1+N)/(1+df)) + 1",
         "bbidf_band": "mu + 0.5*sigma / mu + 2.5*sigma over nonzero freqs; fallback [1.5,4.5] if band_inf>=band_sup or n_tokens<30",
         "bbidf_change_vs_tfidf": "df -> df_banda only (no hard zeroing of weights)",

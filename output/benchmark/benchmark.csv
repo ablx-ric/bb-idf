@@ -1,4 +1,0 @@
-algorithm,vocab_size,matrix_shape,fit_time_s,transform_time_s,query_time_s,sparsity,density,matrix_memory_kb,serialized_size_kb,precision@1,recall@1,ndcg@1,precision@3,recall@3,ndcg@3,precision@5,recall@5,ndcg@5,precision@10,recall@10,ndcg@10,MAP,MRR
-tfidf,21330,"(34, 21330)",0.2968,0.0331,0.0072,0.909172,0.090828,5665.78,448.62,1.0,1.0,1.0,0.3333,1.0,1.0,0.2,1.0,1.0,0.1,1.0,1.0,1.0,1.0
-textrank,24636,"(34, 24636)",7.0189,1.1163,0.0112,0.91808,0.08192,6543.94,362.37,1.0,1.0,1.0,0.3333,1.0,1.0,0.2,1.0,1.0,0.1,1.0,1.0,1.0,1.0
-bbidf,21330,"(34, 21330)",0.8508,0.0335,0.0106,0.909172,0.090828,5665.78,781.0,1.0,1.0,1.0,0.3333,1.0,1.0,0.2,1.0,1.0,0.1,1.0,1.0,1.0,1.0

@@ -25,6 +25,17 @@ def ranked_terms(weight_row: np.ndarray, vocab: list[str],
     return out[:k] if k is not None else out
 
 
+def ranked_terms_with_scores(weight_row: np.ndarray, vocab: list[str],
+                             k: int | None = None) -> list[tuple[str, float]]:
+    """Like :func:`ranked_terms` but returns ``(term, weight)`` pairs."""
+    order = sorted(
+        range(len(vocab)),
+        key=lambda i: (-weight_row[i], vocab[i]),
+    )
+    out = [(vocab[i], float(weight_row[i])) for i in order if weight_row[i] > 0]
+    return out[:k] if k is not None else out
+
+
 def precision_at_k(ranked: list[str], gold: set[str], k: int) -> float:
     if k <= 0 or not ranked:
         return 0.0

@@ -31,7 +31,7 @@ def main():
     args = parser.parse_args()
 
     corpus_dir = Path("data/corpus")
-    output_dir = Path("output")
+    output_dir = Path("results/legacy")
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Cargando documentos desde {corpus_dir} ...")

@@ -338,11 +338,14 @@ actuales, y debería revisarse antes de cualquier uso.
 ## Archivos generados
 
 - `results/raw/per_doc_metrics.csv` — métricas por documento/algoritmo/K.
-- `results/processed/summary.csv`, `improvement_bbidf_vs_tfidf.csv`,
-  `gap_to_textrank.csv`.
+- `results/processed/summary.csv`, `per_doc_wide.csv` (una fila por documento),
+  `improvement_bbidf_vs_tfidf.csv`, `gap_to_textrank.csv`.
 - `results/statistical/paired_tests.csv`, `robustness.csv`,
   `band_diagnostic.csv`.
-- `results/metrics/top10_keywords.csv`, `keywords_ranked.csv`.
-- `results/tables/case_analysis.md`.
-- `results/figures/*.png` (9 figuras).
+- `results/metrics/keywords_ranked.csv` (ranking completo con score),
+  `top10_keywords.csv`.
+- `results/tables/case_analysis.md`, `per_document.md` (ranking Top-10 por
+  documento con gold resaltado).
+- `results/figures/*.png` (11 figuras, incl. nubes de palabras y frecuencia).
+- `results/legacy/` — salida del benchmark legado (`main.py`).
 - `results/metadata.json` — configuración reproducible.

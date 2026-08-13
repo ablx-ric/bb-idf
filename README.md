@@ -19,28 +19,31 @@ Hay dos vías de ejecución:
 ### 1. Evaluación de extracción de keywords (principal)
 
 ```bash
-# Métricas por documento/algoritmo/K + estadística + eficiencia
-uv run python -m bb_idf.experiment.run
+# Todo de una vez (tests + métricas + figuras + robustez)
+uv run python run_all.py
 
-# Figuras científicas (results/figures/)
-uv run python -m bb_idf.experiment.plots
-
-# Robustez (ventana de TextRank, variante de banda dura, diagnóstico) + casos
-uv run python -m bb_idf.experiment.robustness
+# O paso a paso:
+uv run python -m bb_idf.experiment.run         # métricas + estadística + eficiencia
+uv run python -m bb_idf.experiment.plots       # figuras (incl. nubes de palabras)
+uv run python -m bb_idf.experiment.robustness  # robustez + análisis de casos
 ```
+
+Nota: el preprocesado con spaCy se cachea en `data/processed/preprocessed.pkl`
+y se reutiliza entre pasos; bórralo si cambias el corpus o el preprocesado.
 
 Estructura de salida:
 
 ```
 results/
 ├── raw/            per_doc_metrics.csv, doc_info.csv
-├── processed/      summary.csv, improvement_bbidf_vs_tfidf.csv, gap_to_textrank.csv
-├── metrics/        top10_keywords.csv, keywords_ranked.csv
+├── processed/      summary.csv, per_doc_wide.csv, improvement_bbidf_vs_tfidf.csv, gap_to_textrank.csv
+├── metrics/        keywords_ranked.csv (con score), top10_keywords.csv
 ├── statistical/    paired_tests.csv, robustness.csv, band_diagnostic.csv
-├── figures/        9 figuras PNG
-├── tables/         case_analysis.md
+├── figures/        11 figuras PNG (incluye nubes de palabras y frecuencia)
+├── tables/         case_analysis.md, per_document.md (ranking Top-10 por documento)
+├── legacy/         salida del benchmark legado (main.py)
 ├── metadata.json   configuración reproducible
-└── INFORME_EXPERIMENTAL.md
+└── INFORME_EXPERIMENTAL.md  (informe también en docs/)
 ```
 
 ### 2. Benchmark legado (solo eficiencia)
@@ -48,7 +51,7 @@ results/
 ```bash
 uv run python main.py              # corrida única
 uv run python main.py --runs 10    # media +/- std (tiempos)
-uv run python main.py --graphs     # 15 gráficos en output/figures/
+uv run python main.py --graphs     # gráficos en results/legacy/figures/
 uv run python main.py --scalability
 ```
 
