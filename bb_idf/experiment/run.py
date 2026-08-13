@@ -16,6 +16,7 @@ import polars as pl
 
 from bb_idf.experiment import gold as gold_module
 from bb_idf.experiment import metrics as metrics_module
+from bb_idf.experiment import per_doc as per_doc_module
 from bb_idf.experiment import pipeline as pipeline_module
 from bb_idf.experiment import scorers as scorers_module
 from bb_idf.experiment import stats as stats_module
@@ -73,6 +74,7 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
         weights[name] = W
 
     # ---- Per-document metrics ----
+    vidx = {t: i for i, t in enumerate(vocab)}
     rows = []
     keyword_rows = []
     doc_rows = []
@@ -93,11 +95,16 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
                    "n_tokens": len(docs_tokens[d]), "n_gold": len(gold)}
             row.update(ev)
             rows.append(row)
-            ranked = metrics_module.ranked_terms_with_scores(weights[name][d], vocab)
+            W = weights[name][d]
+            norm = float(np.linalg.norm(W))
+            ranked = metrics_module.ranked_terms_with_scores(W, vocab)
             for rank, (term, score) in enumerate(ranked[:max(ks)], start=1):
                 keyword_rows.append({
-                    "doc_id": d, "algorithm": name, "rank": rank, "term": term,
-                    "score": round(score, 6), "in_gold": term in gold,
+                    "doc_id": d, "doc": f"doc{d + 1}", "algorithm": name,
+                    "rank": rank, "term": term,
+                    "score": round(float(W[vidx[term]] / norm), 6) if norm > 0 else 0.0,
+                    "score_raw": round(score, 6),
+                    "in_gold": term in gold,
                 })
 
     df = pl.DataFrame(rows)
@@ -285,6 +292,11 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
                 "keywords": ", ".join(ranked),
             })
     pl.DataFrame(top_rows).write_csv(output_dir / "metrics" / "top10_keywords.csv")
+
+    # ---- Per-document folders (top-50 CSV + word clouds per algorithm) ----
+    per_doc_module.export_per_document(
+        documents, docs_tokens, vocab, weights, gold_sets, excluded,
+        output_dir=output_dir / "per_document", top_n=50)
 
     return {
         "metadata": metadata,

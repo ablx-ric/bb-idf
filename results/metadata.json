@@ -24,15 +24,15 @@
   "bbidf_band": "mu + 0.5*sigma / mu + 2.5*sigma over nonzero freqs; fallback [1.5,4.5] if band_inf>=band_sup or n_tokens<30",
   "bbidf_change_vs_tfidf": "df -> df_banda only (no hard zeroing of weights)",
   "seed": 0,
-  "prep_time_s": 5.3092,
+  "prep_time_s": 8.0004,
   "fit_time_s": {
-    "tfidf": 0.0043,
-    "bbidf": 0.0083,
-    "textrank": 3.9751
+    "tfidf": 0.006,
+    "bbidf": 0.0147,
+    "textrank": 4.2147
   },
   "per_doc_time_s": {
-    "tfidf": 0.00013,
-    "bbidf": 0.000251,
-    "textrank": 0.120457
+    "tfidf": 0.000183,
+    "bbidf": 0.000444,
+    "textrank": 0.127719
   }
 }

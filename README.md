@@ -163,6 +163,13 @@ $$S(v_i) = (1-d) + d \cdot \sum_{v_j \in In(v_i)} \frac{w_{ji}}{\sum_{v_k \in Ou
 - **nDCG@K**: DCG normalizado (relevancia binaria; aporta poco más que P@K con
   este gold, se reporta en los datos crudos pero no en las conclusiones).
 
+**Comparabilidad de scores.** Los scores crudos de cada algoritmo están en
+escalas distintas (TF-IDF/BB-IDF son `tf × idf`, del orden de cientos; TextRank
+es PageRank, del orden de decenas). Para hacerlos comparables, todos los scores
+exportados se **normalizan con L2 por documento** (`score = w / ‖w_d‖₂`, rango
+[0, 1]); el valor crudo se conserva como `score_raw`. Esta normalización **no
+afecta al ranking** (que es invariante a escala) ni a las métricas.
+
 ---
 
 ## 8. Resultados
@@ -291,10 +298,12 @@ results/
 ├── raw/            per_doc_metrics.csv, doc_info.csv
 ├── processed/      summary.csv, per_doc_wide.csv (una fila por documento),
 │                   improvement_bbidf_vs_tfidf.csv, gap_to_textrank.csv
-├── metrics/        keywords_ranked.csv (ranking completo con score), top10_keywords.csv
+├── metrics/        keywords_ranked.csv (score L2 + raw), top10_keywords.csv
 ├── statistical/    paired_tests.csv, robustness.csv, band_diagnostic.csv
 ├── figures/        11 figuras PNG (ver §12)
 ├── tables/         case_analysis.md, per_document.md (Top-10 por documento con gold marcado)
+├── per_document/   doc1/…doc33/: top-50 keywords (CSV) + nube de palabras por algoritmo,
+│                   y documents_index.csv (docX → archivo original)
 ├── benchmark/      salida del benchmark computacional (main.py)
 ├── metadata.json   configuración reproducible
 └── INFORME_EXPERIMENTAL.md

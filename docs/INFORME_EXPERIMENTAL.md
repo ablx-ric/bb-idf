@@ -153,6 +153,15 @@ Son apropiadas para un gold standard en forma de **conjunto de términos**
 (extracción de keywords). MAP/MRR/AP son válidos; nDCG@K con relevancia
 binaria aporta poco más que P@K y no se usa en las conclusiones.
 
+**Comparabilidad de scores.** Los scores crudos de los tres algoritmos viven en
+escalas distintas (TF-IDF y BB-IDF son `tf × idf`, del orden de cientos;
+TextRank es un valor de PageRank, del orden de decenas). Para permitir la
+comparación entre algoritmos, todos los scores exportados se **normalizan con
+L2 por documento** (`score = w / ‖w_d‖₂`, en [0, 1]), conservando el valor crudo
+como `score_raw`. Esta normalización es una transformación monótona por
+documento: **no altera el ranking ni las métricas**, que son invariantes a
+escala.
+
 ---
 
 ## 9–11. Resultados (media F1@K y ranking)
@@ -353,6 +362,10 @@ actuales, y debería revisarse antes de cualquier uso.
   `top10_keywords.csv`.
 - `results/tables/case_analysis.md`, `per_document.md` (ranking Top-10 por
   documento con gold resaltado).
+- `results/per_document/doc1/…doc33/` — por documento: top-50 keywords por
+  algoritmo (`tfidf.csv`, `bbidf.csv`, `textrank.csv`, con score L2 + raw) y
+  nube de palabras por algoritmo; `documents_index.csv` mapea `docX` al archivo
+  original.
 - `results/figures/*.png` (11 figuras, incl. nubes de palabras y frecuencia).
 - `results/benchmark/` — salida del benchmark computacional (`main.py`).
 - `results/metadata.json` — configuración reproducible.
