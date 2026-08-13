@@ -43,6 +43,41 @@ documentos académicos de turismo.
 
 ---
 
+## Mapa de archivos (referencia rápida para el investigador principal)
+
+### Documentación
+- [Informe experimental completo](docs/INFORME_EXPERIMENTAL.md) — resultado y análisis detallado.
+- [Análisis de complejidad (Big-O)](docs/analisis_complejidad.md) — complejidad asintótica comparativa.
+- [Recomendaciones de evaluación](docs/recomendaciones.txt) — plan original de evaluación.
+
+### Orquestador y código de la evaluación
+- [run_all.py](run_all.py) — ejecuta todo con un solo comando.
+- [bb_idf/experiment/run.py](bb_idf/experiment/run.py) — orquestador (métricas + estadística + eficiencia).
+- [bb_idf/experiment/pipeline.py](bb_idf/experiment/pipeline.py) — carga PDFs + preprocesado spaCy (cacheado).
+- [bb_idf/experiment/scorers.py](bb_idf/experiment/scorers.py) — TF-IDF / BB-IDF / TextRank sobre el mismo vocabulario.
+- [bb_idf/experiment/metrics.py](bb_idf/experiment/metrics.py) — P/R/F1@K, AP, MAP, MRR, nDCG@K.
+- [bb_idf/experiment/stats.py](bb_idf/experiment/stats.py) — Wilcoxon, bootstrap CI, Cohen's d, rank-biserial.
+- [bb_idf/experiment/gold.py](bb_idf/experiment/gold.py) — gold standard de autores (curado).
+- [bb_idf/experiment/plots.py](bb_idf/experiment/plots.py) — figuras + nubes de palabras.
+- [bb_idf/experiment/robustness.py](bb_idf/experiment/robustness.py) — robustez + análisis de casos.
+- [bb_idf/experiment/similarity.py](bb_idf/experiment/similarity.py) — similitud de ranking con TextRank.
+- [bb_idf/experiment/per_doc.py](bb_idf/experiment/per_doc.py) — export por documento (top-50 + nubes).
+
+### Algoritmos (paquete original)
+- [bb_idf/algorithms/tfidf.py](bb_idf/algorithms/tfidf.py) · [bb_idf/algorithms/bbidf.py](bb_idf/algorithms/bbidf.py) · [bb_idf/algorithms/textrank.py](bb_idf/algorithms/textrank.py)
+
+### Resultados (generados)
+- [results/metadata.json](results/metadata.json) — configuración y eficiencia reproducibles.
+- Tablas: [summary.csv](results/processed/summary.csv) · [per_doc_wide.csv](results/processed/per_doc_wide.csv) · [improvement_bbidf_vs_tfidf.csv](results/processed/improvement_bbidf_vs_tfidf.csv) · [gap_to_textrank.csv](results/processed/gap_to_textrank.csv) · [paired_tests.csv](results/statistical/paired_tests.csv) · [similarity_tests.csv](results/statistical/similarity_tests.csv) · [robustness.csv](results/statistical/robustness.csv) · [band_diagnostic.csv](results/statistical/band_diagnostic.csv)
+- Análisis por documento: [per_document.md](results/tables/per_document.md) · [case_analysis.md](results/tables/case_analysis.md)
+- Keywords por documento: [documents_index.csv](results/per_document/documents_index.csv) (y `results/per_document/doc1/…doc33/`)
+- Figuras clave: [f1_comparison.png](results/figures/f1_comparison.png) · [improvement_bbidf.png](results/figures/improvement_bbidf.png) · [efficiency.png](results/figures/efficiency.png) · [similarity_to_textrank.png](results/figures/similarity_to_textrank.png) (resto en `results/figures/`)
+
+### Configuración y tests
+- [pyproject.toml](pyproject.toml) · [tests/](tests/) · [main.py](main.py)
+
+---
+
 ## 1. Pregunta de investigación y estructura conceptual
 
 ```
@@ -158,7 +193,7 @@ $$S(v_i) = (1-d) + d \cdot \sum_{v_j \in In(v_i)} \frac{w_{ji}}{\sum_{v_k \in Ou
 | Comparación principal | BB-IDF vs TF-IDF (pareada por documento) |
 | Comparación secundaria | BB-IDF / TF-IDF vs TextRank |
 | Estadística | Wilcoxon signed-rank, bootstrap CI 95%, Cohen's d (pareado), rank-biserial |
-| Eficiencia | tiempos de ajuste/por-documento |
+| Eficiencia | tiempo, throughput y memoria pico (tracemalloc) |
 | Robustez | ventana TextRank 2/5/10, variante de banda dura, diagnóstico de banda |
 
 ---
@@ -169,7 +204,8 @@ $$S(v_i) = (1-d) + d \cdot \sum_{v_j \in In(v_i)} \frac{w_{ji}}{\sum_{v_k \in Ou
 - **R@K**: fracción de keywords de autor recuperadas en el Top-K.
 - **F1@K**: media armónica de P@K y R@K.
 - **AP** (Average Precision): media de la precisión en cada posición relevante
-  (resume el ranking completo).
+  de un documento (resume su ranking completo).
+- **MAP** (Mean Average Precision): media de AP sobre los documentos.
 - **MRR**: inversa del rango de la primera keyword relevante.
 - **nDCG@K**: DCG normalizado (relevancia binaria; aporta poco más que P@K con
   este gold, se reporta en los datos crudos pero no en las conclusiones).
@@ -195,8 +231,10 @@ afecta al ranking** (que es invariante a escala) ni a las métricas.
 | F1@50 | 0.190 | 0.190 | 0.185 |
 | P@10 | 0.363 | **0.397** | 0.387 |
 | R@10 | 0.587 | **0.639** | 0.631 |
-| AP | 0.488 | 0.500 | **0.508** |
+| MAP | 0.488 | 0.500 | **0.508** |
 | MRR | 0.741 | 0.747 | **0.828** |
+
+![F1@K por algoritmo](results/figures/f1_comparison.png)
 
 ### 8.2 Mejora de BB-IDF sobre TF-IDF (F1@K)
 
@@ -211,10 +249,12 @@ En F1@10, BB-IDF gana en 10/30, empata en 19/30 y pierde en 1/30. La **mediana
 de mejora es 0%** (dominan los empates): la ventaja es real pero concentrada en
 ~1/3 de los documentos.
 
+![Mejora de BB-IDF sobre TF-IDF](results/figures/improvement_bbidf.png)
+
 ### 8.3 Comparación contra TextRank (benchmark)
 
 - **BB-IDF vs TextRank**: sin diferencias significativas (todos p > 0.2).
-  BB-IDF alcanza **102%** del F1@10 de TextRank, **98%** de su AP y **90%** de
+  BB-IDF alcanza **102%** del F1@10 de TextRank, **98%** de su MAP y **90%** de
   su MRR.
 - **TF-IDF vs TextRank**: TextRank supera a TF-IDF en F1@5, AP y MRR; empate en
   F1@10/F1@20.
@@ -222,13 +262,18 @@ de mejora es 0%** (dominan los empates): la ventaja es real pero concentrada en
 
 ### 8.4 Eficiencia (33 docs, sin preprocesado)
 
-| Algoritmo | Tiempo total | Tiempo/doc | Factor vs TF-IDF |
-|---|---|---|---|
-| TF-IDF | 0.0042 s | 0.00013 s | 1× |
-| BB-IDF | 0.0089 s | 0.00027 s | 2.1× |
-| TextRank | 4.117 s | 0.125 s | ~980× |
+| Algoritmo | Tiempo total | Throughput | Memoria pico | Factor tiempo vs TF-IDF |
+|---|---|---|---|---|
+| TF-IDF | ~0.004 s | ~4 200 docs/s | ~8.5 MB | 1× |
+| BB-IDF | ~0.009 s | ~2 200 docs/s | ~8.5 MB | ~2× |
+| TextRank | ~5 s | ~6 docs/s | ~102 MB | ~1000× |
 
-(Preprocesado spaCy: ~60 s, una sola vez y cacheado.)
+- **Tiempo/throughput**: sobre la matriz de conteos; el preprocesado spaCy
+  (~60 s, cacheado) es compartido y no se incluye.
+- **Memoria pico**: `tracemalloc` durante el ajuste. TextRank reserva el grafo
+  de co-ocurrencia por documento (~12× más memoria que TF-IDF/BB-IDF).
+- **Complejidad asintótica**: [docs/analisis_complejidad.md](docs/analisis_complejidad.md)
+  — TF-IDF y BB-IDF son O(N·V); TextRank es O(N·(L̄·W + I·Ū²)).
 
 ### 8.5 Similitud de ranking con TextRank (análisis suplementario)
 
@@ -262,7 +307,7 @@ de TF-IDF. (Interpretación como *convergencia de rankings*, no como calidad.)
 4. **¿Es consistente?** No. Gana en 10/30, empata en 19/30, pierde en 1/30. La
    ventaja se concentra en documentos con keywords específicas y frecuentes.
 5. **¿Qué tan cerca está BB-IDF de TextRank?** A la par: F1@10 = 102% del
-   desempeño de TextRank, AP = 98%, MRR = 90%.
+   desempeño de TextRank, MAP = 98%, MRR = 90%.
 6. **¿Costo computacional?** ~2× TF-IDF (0.009 s vs 0.004 s para 33 docs) y ~3
    órdenes de magnitud más barato que TextRank (4.1 s).
 
@@ -366,7 +411,7 @@ uv run python main.py --scalability
 | `per_doc_boxplot.png` | Distribución por documento (F1@10, AP) con puntos individuales |
 | `paired_diff_f1.png` | Histograma de diferencias pareadas (BB-IDF − TF-IDF) en F1@10 |
 | `heatmap_f1_doc.png` | F1@10 por documento × algoritmo (valores en cada celda) |
-| `efficiency.png` | Tiempo total y por documento |
+| `efficiency.png` | Tiempo total, tiempo/doc, memoria pico y throughput (panel 2×2) |
 | `quality_time_tradeoff.png` | F1@10 vs tiempo (escala log) |
 | `wordclouds.png` | **Nubes de palabras** de cada algoritmo (score acumulado) |
 | `keyword_frequency.png` | Top-20 términos más frecuentes en el Top-10 de cada algoritmo |

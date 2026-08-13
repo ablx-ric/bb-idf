@@ -17,7 +17,7 @@ inventado).
 de frecuencia documental `df(t)` se reemplaza por un `df` filtrado por banda
 estadística— mejora a TF-IDF de forma **modesta y acotada**: la mejora es
 estadísticamente significativa en **F1@10 y R@10** (p = 0.006, d ≈ 0.56), pero
-no significativa en K = 5, 20 o 50, ni en AP/MRR. BB-IDF queda **a la par de
+no significativa en K = 5, 20 o 50, ni en MAP/MRR. BB-IDF queda **a la par de
 TextRank** (sin diferencias significativas) y, en F1@10, lo iguala o supera
 ligeramente. Además se detectó que la variante de BB-IDF con **filtro duro de
 banda** (la que implementa `bb_idf/algorithms/bbidf.py`) produce resultados
@@ -146,11 +146,12 @@ cuerpo en español y keywords solo en inglés fue traducido fielmente, ver
 - **F1@K**: media armónica de P@K y R@K.
 - **AP (Average Precision)**: media de la precisión en cada posición de una
   keyword relevante (resume el ranking completo).
+- **MAP (Mean Average Precision)**: media de AP sobre los documentos.
 - **MRR**: inversa del rango de la primera keyword relevante.
 - **nDCG@K**: DCG normalizado con relevancia binaria.
 
 Son apropiadas para un gold standard en forma de **conjunto de términos**
-(extracción de keywords). MAP/MRR/AP son válidos; nDCG@K con relevancia
+(extracción de keywords). AP, MAP y MRR son válidos; nDCG@K con relevancia
 binaria aporta poco más que P@K y no se usa en las conclusiones.
 
 **Comparabilidad de scores.** Los scores crudos de los tres algoritmos viven en
@@ -172,7 +173,7 @@ escala.
 | F1@10 | 0.437 | **0.477** | 0.467 |
 | F1@20 | 0.348 | 0.347 | 0.349 |
 | F1@50 | 0.190 | 0.190 | 0.185 |
-| AP | 0.488 | 0.500 | **0.508** |
+| MAP | 0.488 | 0.500 | **0.508** |
 | MRR | 0.741 | 0.747 | **0.828** |
 
 (R@K sigue la misma pauta: R@10 = 0.587 / 0.639 / 0.631.)
@@ -195,12 +196,12 @@ mejora media positiva se debe a un subconjunto de documentos; la **mediana es
 ## 13. Comparación contra TextRank (benchmark)
 
 - **BB-IDF vs TextRank**: ninguna diferencia significativa en ninguna métrica
-  (todos p > 0.2). En F1@10, BB-IDF (0.477) ≥ TextRank (0.467); en AP, TextRank
+  (todos p > 0.2). En F1@10, BB-IDF (0.477) ≥ TextRank (0.467); en MAP, TextRank
   (0.508) > BB-IDF (0.500); en MRR, TextRank (0.828) > BB-IDF (0.747).
-- **TF-IDF vs TextRank**: TextRank supera a TF-IDF en F1@5 (+0.023), AP
+- **TF-IDF vs TextRank**: TextRank supera a TF-IDF en F1@5 (+0.023), MAP
   (+0.020) y MRR (+0.087); empate en F1@10/F1@20.
 - **Porcentaje del desempeño de TextRank alcanzado por BB-IDF**: F1@10 = 102%
-  (supera), AP = 98%, MRR = 90%.
+  (supera), MAP = 98%, MRR = 90%.
 - BB-IDF supera a TextRank en 7/30 documentos (F1@10); TextRank supera a
   BB-IDF en 6/30; empate en 17/30.
 
@@ -216,7 +217,7 @@ Prueba pareada de Wilcoxon sobre las diferencias por documento:
 | F1@5 | 0.266 | +0.10 | 9 | [−0.025, +0.047] |
 | F1@20 | 0.750 | −0.04 | 4 | — |
 | F1@50 | 0.625 | +0.02 | 4 | — |
-| AP | 0.584 | +0.16 | 30 | [−0.013, +0.037] |
+| MAP | 0.584 | +0.16 | 30 | [−0.013, +0.037] |
 | MRR | 0.899 | +0.03 | 14 | — |
 
 **Interpretación:** la mejora es estadísticamente significativa **solo en
@@ -238,14 +239,17 @@ potencia (muchos empates).
 
 | Métrica | TF-IDF | BB-IDF | TextRank |
 |---|---|---|---|
-| Tiempo total (s) | 0.0042 | 0.0089 | 4.117 |
-| Tiempo/doc (s) | 0.00013 | 0.00027 | 0.125 |
-| Factor vs TF-IDF | 1× | **2.1×** | **~980×** |
+| Tiempo total | ~0.004 s | ~0.009 s | ~5 s |
+| Throughput | ~4 200 docs/s | ~2 200 docs/s | ~6 docs/s |
+| Memoria pico (tracemalloc) | ~8.5 MB | ~8.5 MB | ~102 MB |
+| Factor tiempo vs TF-IDF | 1× | **~2×** | **~1000×** |
 
-(Preprocesado spaCy: 60.1 s, único y compartido.) BB-IDF cuesta ~2× TF-IDF
-(por el cálculo de banda y el conteo filtrado); TextRank es ~3 órdenes de
-magnitud más caro. El trade-off calidad/costo favorece a BB-IDF frente a
-TextRank.
+(Preprocesado spaCy: ~60 s, único, compartido y cacheado; no incluido en los
+tiempos.) BB-IDF cuesta ~2× TF-IDF (cálculo de banda y conteo filtrado);
+TextRank es ~3 órdenes de magnitud más caro y ~12× más memoria (grafo de
+co-ocurrencia por documento). El análisis de complejidad asintótica está en
+[docs/analisis_complejidad.md](docs/analisis_complejidad.md): TF-IDF y BB-IDF
+son O(N·V); TextRank es O(N·(L̄·W + I·Ū²)).
 
 ## 16b. Similitud de ranking con TextRank (análisis suplementario)
 
@@ -272,7 +276,7 @@ frecuencia, más próximo al comportamiento de TextRank que al de TF-IDF.
 2. `f1_comparison.png` — barras F1@K (valores anotados).
 3. `improvement_bbidf.png` — mejora % de BB-IDF vs TF-IDF (media ± SE).
 4. `per_doc_boxplot.png` — distribución por documento (F1@10, AP) con puntos individuales.
-5. `efficiency.png` — tiempo total y por documento (valores anotados).
+5. `efficiency.png` — tiempo total, tiempo/doc, memoria pico y throughput (panel 2×2).
 6. `quality_time_tradeoff.png` — F1@10 vs tiempo (escala log).
 7. `heatmap_f1_doc.png` — F1@10 por documento × algoritmo (valores en celdas).
 8. `f1_with_ci.png` — medias F1@K con IC 95%.
@@ -337,7 +341,7 @@ documentos con contenido no temático (planes de negocio, metodología).
 **Resultados observados (con 30 documentos):**
 - BB-IDF (solo-df) mejora a TF-IDF en **F1@10: 0.437 → 0.477 (+10.3%)**, y en
   R@10/P@10, de forma **estadísticamente significativa** (p = 0.006, d = 0.56).
-- La mejora **no es significativa** en K = 5, 20, 50, ni en AP/MRR.
+- La mejora **no es significativa** en K = 5, 20, 50, ni en MAP/MRR.
 - BB-IDF está **a la par de TextRank** (sin diferencias significativas), y lo
   supera ligeramente en F1@10.
 - La variante de BB-IDF con **filtro duro de banda** (la de `bbidf.py`)
@@ -348,11 +352,11 @@ documentos con contenido no temático (planes de negocio, metodología).
    (y en R@10/P@10); en el resto de configuraciones es indistinguible.
 2. **¿Cuánto?** F1@10: +10.3% de media (de 0.437 a 0.477), con efecto
    moderado (d = 0.56). La mediana de mejora es 0% (muchos empates).
-3. **¿Es significativa?** Sí en F1@10/R@10 (p = 0.006); no en K=5/20/50/AP/MRR.
+3. **¿Es significativa?** Sí en F1@10/R@10 (p = 0.006); no en K=5/20/50/MAP/MRR.
 4. **¿Es consistente?** No: gana en 10/30, empata en 19/30, pierde en 1/30.
    La ventaja se concentra en documentos con keywords específicas frecuentes.
 5. **¿Qué tan cerca está BB-IDF de TextRank?** A la par; F1@10 = 102% del
-   desempeño de TextRank, AP = 98%, MRR = 90%.
+   desempeño de TextRank, MAP = 98%, MRR = 90%.
 6. **¿Costo computacional?** ~2× el de TF-IDF (0.009 s vs 0.004 s para 33
    docs); ~3 órdenes de magnitud más barato que TextRank (4.1 s).
 
@@ -392,4 +396,5 @@ actuales, y debería revisarse antes de cualquier uso.
   `results/statistical/similarity_tests.csv` — análisis suplementario de
   similitud de ranking con TextRank.
 - `results/benchmark/` — salida del benchmark computacional (`main.py`).
-- `results/metadata.json` — configuración reproducible.
+- `results/metadata.json` — configuración, tiempos, throughput y memoria.
+- `docs/analisis_complejidad.md` — análisis de complejidad Big-O comparativo.

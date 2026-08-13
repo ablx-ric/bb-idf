@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import json
 import time
+import tracemalloc
 from pathlib import Path
 
 import numpy as np
@@ -58,20 +59,33 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
     n_docs = len(docs_tokens)
     n_gold_docs = n_docs - len(excluded)
 
-    # ---- Scorers (timed) ----
+    # ---- Scorers (timed, without tracemalloc overhead) ----
+    def _compute(name):
+        if name == "textrank":
+            return scorers_module.textrank_weights(
+                docs_tokens, vocab, window=textrank_window)
+        if name == "bbidf":
+            return scorers_module.bbidf_weights(X)
+        return scorers_module.tfidf_weights(X)
+
     weights = {}
     times = {}
+    matrix_mem = {}
     for name in ALGORITHMS:
         t = time.perf_counter()
-        if name == "textrank":
-            W = scorers_module.textrank_weights(
-                docs_tokens, vocab, window=textrank_window)
-        elif name == "bbidf":
-            W = scorers_module.bbidf_weights(X)
-        else:
-            W = scorers_module.tfidf_weights(X)
+        W = _compute(name)
         times[name] = time.perf_counter() - t
+        matrix_mem[name] = W.nbytes / 1024.0  # KB
         weights[name] = W
+
+    # ---- Peak memory (separate pass, tracemalloc) ----
+    peak_mem = {}
+    for name in ALGORITHMS:
+        tracemalloc.start()
+        _compute(name)
+        _, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+        peak_mem[name] = peak / 1024.0  # KB
 
     # ---- Per-document metrics ----
     vidx = {t: i for i, t in enumerate(vocab)}
@@ -193,7 +207,9 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
         for m in metric_cols:
             vals = sub[m].to_numpy()
             desc = stats_module.describe(vals)
-            summary_rows.append({"algorithm": name, "metric": m, **desc})
+            # Rename the corpus aggregate: mean(AP) over documents is MAP.
+            summary_name = "MAP" if m == "AP" else m
+            summary_rows.append({"algorithm": name, "metric": summary_name, **desc})
 
     summary = pl.DataFrame(summary_rows)
     summary.write_csv(output_dir / "processed" / "summary.csv")
@@ -276,6 +292,9 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
         "prep_time_s": round(t_prep, 4),
         "fit_time_s": {k: round(v, 4) for k, v in times.items()},
         "per_doc_time_s": {k: round(v / n_docs, 6) for k, v in times.items()},
+        "throughput_docs_per_s": {k: round(n_docs / v, 2) if v > 0 else None for k, v in times.items()},
+        "peak_memory_kb": {k: round(v, 2) for k, v in peak_mem.items()},
+        "matrix_memory_kb": {k: round(v, 2) for k, v in matrix_mem.items()},
     }
     (output_dir / "metadata.json").write_text(
         json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
