@@ -215,6 +215,14 @@ mejora media positiva se debe a un subconjunto de documentos; la **mediana es
 
 Prueba pareada de Wilcoxon sobre las diferencias por documento:
 
+La **unidad de análisis** es el documento (n = 30); las comparaciones son
+**pareadas** porque cada documento aporta un valor para ambos algoritmos. Se
+emplea **Wilcoxon signed-rank** (no paramétrico) porque las métricas por
+documento no siguen una distribución normal (valores acotados y muchos empates).
+El **p-value** indica la probabilidad de observar la diferencia bajo la hipótesis
+nula (α = 0.05); el **tamaño del efecto** se reporta con **Cohen's d** pareado
+(0.2 pequeño, 0.5 medio, 0.8 grande) y el **IC 95%** se obtiene por bootstrap.
+
 | Métrica | p | Cohen's d | n pares (dif ≠ 0) | IC 95% diff |
 |---|---|---|---|---|
 | F1@10 | **0.006** | +0.56 | 11 | [+0.016, +0.065] |

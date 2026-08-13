@@ -12,14 +12,14 @@ documentos académicos de turismo.
 ### Respuestas directas (n = 30 documentos)
 
 1. **¿BB-IDF mejora a TF-IDF?** Sí, de forma **modesta y acotada a K = 10**:
-   F1@10 = 0.437 → 0.477 (+10.3%). En K = 5/20/50 y en AP/MRR no hay mejora
+   F1@10 = 0.437 → 0.477 (+10.3%). En K = 5/20/50 y en MAP/MRR no hay mejora
    significativa; la mejora no es uniforme (gana 10/30, empata 19/30).
 2. **¿La mejora es estadísticamente significativa?** Sí en **F1@10 y R@10**
    (p = 0.006), con tamaño de efecto **moderado** (Cohen's d = 0.56); P@10 es
    marginal (p = 0.025). No significativa en el resto de configuraciones.
 3. **¿BB-IDF alcanza o supera a TextRank?** **Alcanza la paridad** (sin
    diferencias significativas). Supera ligeramente en F1@10 (0.477 vs 0.467,
-   = 102% de TextRank), pero queda por debajo en AP (98%) y MRR (90%), a un
+   = 102% de TextRank), pero queda por debajo en MAP (98%) y MRR (90%), a un
    coste **~460× menor** que TextRank.
 
 ### Resumen
@@ -151,6 +151,13 @@ $$idf_{banda}(t) = \ln\frac{1+N}{1+df_{banda}(t)} + 1, \qquad w_{t,d} = f_{t,d} 
 - El gold se normaliza con el mismo pipeline y se aplana a **unigramas de
   contenido** (los algoritmos son unigrama).
 
+> **Distinción clave (gold standard ≠ benchmark).** El *gold standard* son las
+> palabras clave declaradas por los autores: es la **verdad de referencia**
+> contra la que se mide la calidad de los tres algoritmos. **TextRank** es un
+> **benchmark**, es decir, otro algoritmo de referencia usado para ubicar el
+> desempeño de TF-IDF y BB-IDF, **no** la verdad. La calidad se mide siempre
+> contra el gold; TextRank solo sirve como punto de comparación.
+
 ---
 
 ## 4. Preprocesamiento (idéntico para los 3 algoritmos y el gold)
@@ -172,6 +179,11 @@ $$idf_{banda}(t) = \ln\frac{1+N}{1+df_{banda}(t)} + 1, \qquad w_{t,d} = f_{t,d} 
 
 $$w_{t,d} = tf_{t,d} \cdot idf(t), \qquad idf(t) = \ln\frac{1+N}{1+df(t)} + 1$$
 
+donde `tf_{t,d}` es la **frecuencia del término** `t` en el documento `d`
+(cuántas veces aparece), `df(t)` es la **frecuencia documental** (en cuántos
+documentos aparece `t`), y `idf(t)` es la **frecuencia inversa** (penaliza los
+términos que aparecen en casi todos los documentos, que no discriminan).
+
 **TextRank** — grafo de co-ocurrencia por documento + PageRank ponderado
 (Mihalcea & Tarau 2004):
 
@@ -189,12 +201,19 @@ $$S(v_i) = (1-d) + d \cdot \sum_{v_j \in In(v_i)} \frac{w_{ji}}{\sum_{v_k \in Ou
 |---|---|
 | Unidad experimental | documento (n = 30 evaluables) |
 | K (Top-K) | 5, 10, 20, 50 |
-| Métricas | P@K, R@K, F1@K, AP, MRR, nDCG@K |
+| Métricas | P@K, R@K, F1@K, AP, MAP, MRR, nDCG@K |
 | Comparación principal | BB-IDF vs TF-IDF (pareada por documento) |
 | Comparación secundaria | BB-IDF / TF-IDF vs TextRank |
 | Estadística | Wilcoxon signed-rank, bootstrap CI 95%, Cohen's d (pareado), rank-biserial |
 | Eficiencia | tiempo, throughput y memoria pico (tracemalloc) |
 | Robustez | ventana TextRank 2/5/10, variante de banda dura, diagnóstico de banda |
+
+**Robustez** — se verifica que las conclusiones no dependan de decisiones
+arbitrarias del diseño: (a) *ventana de TextRank* (2/5/10), para comprobar la
+sensibilidad del benchmark a su parámetro; (b) *variante de banda dura*, para
+medir el efecto del filtro duro (la implementación original) frente a la
+variante aislada; (c) *diagnóstico de banda*, para cuantificar cuántos términos
+anula realmente el filtro (`df_banda = 0`).
 
 ---
 
@@ -224,6 +243,29 @@ exportados se **normalizan con L2 por documento** (`score = w / ‖w_d‖₂`, r
 [0, 1]); el valor crudo se conserva como `score_raw`. Esta normalización **no
 afecta al ranking** (que es invariante a escala) ni a las métricas.
 
+### Métodos estadísticos
+
+- **Unidad de análisis** = el **documento** (n = 30). Cada documento produce un
+  valor de métrica para cada algoritmo, por lo que las comparaciones son
+  **pareadas** (los mismos documentos son evaluados por ambos algoritmos); esto
+  evita la pseudorreplicación de tratar cada keyword como observación
+  independiente.
+- **Wilcoxon signed-rank**: prueba **no paramétrica** para datos pareados. Se
+  usa porque las métricas por documento no siguen una distribución normal
+  (muchos empates y valores acotados). Evalúa si la mediana de las diferencias
+  pareadas es distinta de cero.
+- **p-value**: probabilidad de observar una diferencia igual o mayor bajo la
+  hipótesis nula (sin diferencia real). Se considera **significativa** si
+  `p < 0.05`.
+- **Cohen's d** (pareado): tamaño del efecto estandarizado = media de las
+  diferencias / desviación estándar de las diferencias. Interpretación:
+  `0.2` pequeño, `0.5` medio, `0.8` grande. Complementa al p-value (mide *cuánto*,
+  no solo *si* hay diferencia).
+- **Rank-biserial**: tamaño de efecto no paramétrico basado en los rangos de las
+  diferencias pareadas (1 = BB-IDF siempre mayor, −1 = siempre menor).
+- **Bootstrap CI 95%**: intervalo de confianza de la diferencia media obtenido
+  remuestreando las diferencias pareadas (10 000 remuestreos).
+
 ---
 
 ## 8. Resultados
@@ -245,6 +287,9 @@ afecta al ranking** (que es invariante a escala) ni a las métricas.
 
 ### 8.2 Mejora de BB-IDF sobre TF-IDF (F1@K)
 
+Mejora porcentual por documento: `Mejora (%) = ((M_BB − M_TF) / M_TF) × 100`,
+donde `M` es la métrica (p. ej. F1@K) de cada algoritmo en ese documento.
+
 | K | Mejora media | Mediana | p (Wilcoxon) | Cohen's d |
 |---|---|---|---|---|
 | 5 | +3.4% | 0.0% | 0.266 | +0.10 |
@@ -263,7 +308,7 @@ de mejora es 0%** (dominan los empates): la ventaja es real pero concentrada en
 - **BB-IDF vs TextRank**: sin diferencias significativas (todos p > 0.2).
   BB-IDF alcanza **102%** del F1@10 de TextRank, **98%** de su MAP y **90%** de
   su MRR.
-- **TF-IDF vs TextRank**: TextRank supera a TF-IDF en F1@5, AP y MRR; empate en
+- **TF-IDF vs TextRank**: TextRank supera a TF-IDF en F1@5, MAP y MRR; empate en
   F1@10/F1@20.
 - BB-IDF supera a TextRank en 7/30 documentos (F1@10); TextRank a BB-IDF en 6/30.
 
@@ -285,8 +330,13 @@ de mejora es 0%** (dominan los empates): la ventaja es real pero concentrada en
 ### 8.5 Similitud de ranking con TextRank (análisis suplementario)
 
 Además de la calidad, se mide cuánto se **parece** el ranking de cada algoritmo
-al de TextRank (convergencia de comportamiento, no calidad). Métricas: RBO
-(Rank-Biased Overlap, p=0.9), Jaccard@K y Overlap@K.
+al de TextRank (convergencia de comportamiento, no calidad). Métricas:
+
+- **RBO** (Rank-Biased Overlap, p=0.9): similitud entre dos listas ranqueadas que
+  pondera más las primeras posiciones (0 = sin solapamiento, 1 = listas
+  idénticas). Adecuada para rankings de longitud distinta.
+- **Jaccard@K**: `|A∩B| / |A∪B|` sobre los conjuntos Top-K (ignora el orden).
+- **Overlap@K**: `|A∩B| / K` (fracción de términos compartidos en el Top-K).
 
 | Métrica | TF-IDF | BB-IDF | p (pareado) | Cohen's d |
 |---|---|---|---|---|
@@ -310,7 +360,7 @@ de TF-IDF. (Interpretación como *convergencia de rankings*, no como calidad.)
 2. **¿Cuánto?** F1@10: 0.437 → 0.477 (+10.3% de media), efecto moderado
    (d = 0.56). La mediana de mejora es 0% (muchos empates).
 3. **¿Es significativa?** Sí en F1@10/R@10 (p = 0.006); no en K = 5/20/50 ni en
-   AP/MRR.
+   MAP/MRR.
 4. **¿Es consistente?** No. Gana en 10/30, empata en 19/30, pierde en 1/30. La
    ventaja se concentra en documentos con keywords específicas y frecuentes.
 5. **¿Qué tan cerca está BB-IDF de TextRank?** A la par: F1@10 = 102% del
@@ -454,6 +504,75 @@ tests/                pytest
 main.py               benchmark computacional
 run_all.py            genera todo de una vez
 ```
+
+---
+
+## 14. Notación y glosario
+
+### Notación
+
+| Símbolo | Significado | Valor en este estudio |
+|---|---|---|
+| `N` | número de documentos del corpus | 33 (30 evaluables) |
+| `V` | tamaño del vocabulario (términos únicos) | 15 953 |
+| `K` | nº de keywords extraídas por documento (Top-K) | 5, 10, 20, 50 |
+| `tf_{t,d}` | frecuencia del término `t` en el documento `d` | — |
+| `df(t)` | nº de documentos que contienen `t` | — |
+| `df_banda(t)` | nº de documentos donde `t` cae dentro de su banda | — |
+| `idf(t)` | frecuencia inversa de documento | — |
+| `μ_d, σ_d` | media y desviación estándar de las frecuencias de los términos del documento `d` | — |
+| `w_{t,d}` | peso (score) del término `t` en el documento `d` | — |
+
+### Glosario
+
+- **AP (Average Precision)** — precisión promediada en las posiciones donde
+  aparece una keyword relevante, para un documento (resume su ranking completo).
+- **Banda** — en BB-IDF, el rango `[μ_d+0.5σ_d, μ_d+2.5σ_d]` de frecuencia de
+  término dentro del cual un documento "cuenta" para el `df`.
+- **Benchmark** — método de referencia contra el que se compara el desempeño
+  (aquí TextRank). No es la verdad; la verdad es el gold standard.
+- **Bootstrap CI** — intervalo de confianza obtenido por remuestreo de las
+  diferencias pareadas (10 000 remuestreos).
+- **Cohen's d** — tamaño de efecto estandarizado: 0.2 pequeño, 0.5 medio, 0.8
+  grande.
+- **df (document frequency)** — en cuántos documentos aparece un término.
+- **F1@K** — media armónica de P@K y R@K.
+- **Gold standard** — la referencia de verdad: las palabras clave declaradas por
+  los autores de cada documento.
+- **idf (inverse document frequency)** — ponderación que penaliza términos que
+  aparecen en casi todos los documentos (poco discriminativos).
+- **Keyword de autor** — palabra clave que el autor del documento declara en la
+  sección "Palabras clave(s)"/"Keywords".
+- **Lematización** — reducir cada palabra a su forma canónica (p. ej.
+  "turísticas" → "turístico"), para agrupar variantes morfológicas.
+- **MAP (Mean Average Precision)** — media de AP sobre los documentos.
+- **MRR (Mean Reciprocal Rank)** — media de la inversa del rango de la primera
+  keyword relevante.
+- **nDCG@K** — DCG normalizado (con relevancia binaria es casi redundante con
+  P@K, por eso no se usa en las conclusiones).
+- **n-grama / unigrama** — secuencia de n palabras; unigrama = una sola palabra
+  (los algoritmos son unigrama).
+- **Overlap@K** — `|A∩B|/K`, fracción de términos compartidos en el Top-K.
+- **P@K (Precision@K)** — fracción del Top-K que son keywords de autor.
+- **Pareado** — comparación sobre los mismos documentos (cada documento aporta
+  un valor para cada algoritmo); evita pseudorreplicación.
+- **p-value** — probabilidad de observar una diferencia igual o mayor bajo la
+  hipótesis nula; se considera significativa si `p < 0.05`.
+- **R@K (Recall@K)** — fracción de keywords de autor recuperadas en el Top-K.
+- **Rank-biserial** — tamaño de efecto no paramétrico basado en los rangos de
+  las diferencias pareadas (1 = siempre mayor, −1 = siempre menor).
+- **RBO (Rank-Biased Overlap)** — similitud entre listas ranqueadas que pondera
+  más las primeras posiciones.
+- **Score L2** — score normalizado por la norma L2 del vector de pesos del
+  documento (`w / ‖w_d‖₂`), en [0, 1], para comparar entre algoritmos.
+- **Stopwords** — palabras vacías (artículos, preposiciones) eliminadas en el
+  preprocesado.
+- **tf (term frequency)** — cuántas veces aparece un término en un documento.
+- **Throughput** — nº de documentos procesados por segundo.
+- **Token** — unidad mínima (palabra) tras tokenizar el texto.
+- **Top-K** — las K palabras con mayor score de un documento.
+- **Wilcoxon signed-rank** — prueba estadística no paramétrica para
+  comparaciones pareadas.
 
 ---
 
