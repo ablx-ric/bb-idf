@@ -88,6 +88,17 @@ def export_per_document(documents, docs_tokens, vocab, weights, gold_sets,
             fig.savefig(folder / f"wordcloud_{algo}.png", dpi=200, bbox_inches="tight")
             plt.close(fig)
 
+        # Per-document quality metrics (P/R/F1/nDCG@K, AP, MRR) per algorithm.
+        metric_rows = []
+        for algo in ALGORITHMS:
+            ev = metrics_module.evaluate_document(
+                weights[algo][d], vocab, gold, list(ks))
+            for m, val in ev.items():
+                metric_rows.append({
+                    "algoritmo": algo, "metric": m, "value": round(float(val), 6),
+                })
+        pl.DataFrame(metric_rows).write_csv(folder / "metrics.csv")
+
         # Per-document similarity vs TextRank (tfidf / bbidf).
         if "textrank" in ranked_by_algo:
             tr_terms = [t for t, _ in ranked_by_algo["textrank"]]

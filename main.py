@@ -1,3 +1,14 @@
+"""LEGACY / OBSOLETO — benchmark de recuperación auto-referencial.
+
+Este módulo y sus dependencias (``bb_idf.evaluation``, ``bb_idf.reporting``)
+evalúan un escenario donde cada "consulta" es un documento del propio corpus y
+su relevante es él mismo (auto-recuperación trivial), por lo que sus métricas de
+ranking (MAP/MRR/nDCG) NO discriminan calidad entre algoritmos. No debe usarse
+para la comparación de keywords: la evaluación vigente está en
+``bb_idf.experiment`` (orquestada por ``run_all.py``). Se conserva únicamente
+por referencia histórica.
+"""
+
 import argparse
 from pathlib import Path
 

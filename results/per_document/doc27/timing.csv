@@ -1,4 +1,4 @@
 algoritmo,time_s
-tfidf,0.000069
-bbidf,0.0000286
-textrank,0.0901641
+tfidf,0.0000859
+bbidf,0.00003
+textrank,0.0912081

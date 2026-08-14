@@ -27,41 +27,41 @@
   "bbidf_change_vs_tfidf": "df -> df_banda only (no hard zeroing of weights)",
   "seed": 0,
   "n_reps_efficiency": 10,
-  "prep_time_s": 5.2742,
+  "prep_time_s": 54.3374,
   "fit_time_s": {
-    "tfidf": 0.0054,
-    "bbidf": 0.0095,
-    "textrank": 3.9914
+    "tfidf": 0.0051,
+    "bbidf": 0.0096,
+    "textrank": 3.9783
   },
   "fit_time_std_s": {
-    "tfidf": 0.000525,
-    "bbidf": 0.000946,
-    "textrank": 0.021084
+    "tfidf": 0.000512,
+    "bbidf": 0.001011,
+    "textrank": 0.024303
   },
   "fit_time_median_s": {
-    "tfidf": 0.005214,
-    "bbidf": 0.009144,
-    "textrank": 3.992879
+    "tfidf": 0.004987,
+    "bbidf": 0.009388,
+    "textrank": 3.979097
   },
   "fit_time_min_s": {
-    "tfidf": 0.004909,
-    "bbidf": 0.00856,
-    "textrank": 3.950548
+    "tfidf": 0.004465,
+    "bbidf": 0.008154,
+    "textrank": 3.945933
   },
   "fit_time_max_s": {
-    "tfidf": 0.006718,
-    "bbidf": 0.011213,
-    "textrank": 4.019551
+    "tfidf": 0.006182,
+    "bbidf": 0.010977,
+    "textrank": 4.013442
   },
   "per_doc_time_s": {
-    "tfidf": 0.000163,
-    "bbidf": 0.000287,
-    "textrank": 0.120952
+    "tfidf": 0.000153,
+    "bbidf": 0.00029,
+    "textrank": 0.120556
   },
   "throughput_docs_per_s": {
-    "tfidf": 6142.85,
-    "bbidf": 3482.36,
-    "textrank": 8.27
+    "tfidf": 6518.45,
+    "bbidf": 3453.42,
+    "textrank": 8.29
   },
   "peak_memory_kb": {
     "tfidf": 8476.58,

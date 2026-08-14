@@ -69,6 +69,7 @@ documentos académicos de turismo.
 
 ### Algoritmos (paquete original)
 - [bb_idf/algorithms/tfidf.py](bb_idf/algorithms/tfidf.py) · [bb_idf/algorithms/bbidf.py](bb_idf/algorithms/bbidf.py) · [bb_idf/algorithms/textrank.py](bb_idf/algorithms/textrank.py)
+- **LEGACY / OBSOLETO** — [main.py](main.py) + [bb_idf/evaluation/](bb_idf/evaluation/) + [bb_idf/reporting/](bb_idf/reporting/): benchmark de recuperación auto-referencial (consulta = documento, relevante = él mismo). Sus métricas de ranking no discriminan calidad y **no** deben usarse para la comparación de keywords. Se conserva por referencia histórica.
 
 ### Resultados (generados)
 - [results/metadata.json](results/metadata.json) — configuración y eficiencia reproducibles.
@@ -76,7 +77,7 @@ documentos académicos de turismo.
 - Análisis por documento: [per_document.md](results/tables/per_document.md) · [case_analysis.md](results/tables/case_analysis.md)
 - Keywords tabulares: [top5_keywords.csv](results/metrics/top5_keywords.csv) · [top50_keywords.csv](results/metrics/top50_keywords.csv) · [keywords_ranked.csv](results/metrics/keywords_ranked.csv)
 - Keywords por documento: [documents_index.csv](results/per_document/documents_index.csv) (y `results/per_document/doc1/…doc33/`, que incluyen por documento: top-50 de cada algoritmo, nube por algoritmo, `similarity_textrank.csv` y `timing.csv`)
-- Figuras clave: [f1_comparison.png](results/figures/f1_comparison.png) · [improvement_bbidf.png](results/figures/improvement_bbidf.png) · [efficiency.png](results/figures/efficiency.png) · [similarity_to_textrank.png](results/figures/similarity_to_textrank.png) (resto en `results/figures/`)
+- Figuras clave: [f1_with_ci.png](results/figures/f1_with_ci.png) · [improvement_bbidf.png](results/figures/improvement_bbidf.png) · [efficiency.png](results/figures/efficiency.png) · [similarity_to_textrank.png](results/figures/similarity_to_textrank.png) (resto en `results/figures/`)
 
 ### Configuración y tests
 - [pyproject.toml](pyproject.toml) · [tests/](tests/) · [main.py](main.py)
@@ -301,7 +302,7 @@ afecta al ranking** (que es invariante a escala) ni a las métricas.
 | MAP | 0.488 | 0.500 | **0.508** |
 | MRR | 0.741 | 0.747 | **0.828** |
 
-![F1@K por algoritmo](results/figures/f1_comparison.png)
+![F1@K por algoritmo](results/figures/f1_with_ci.png)
 
 ### 8.2 Mejora de BB-IDF sobre TF-IDF (F1@K)
 
@@ -417,8 +418,8 @@ los pesos fuera de banda) no es superior y debería descartarse.
 - **Lematizador español sobre texto inglés**: el artículo en inglés y los
   fragmentos bilingües no se lematizan bien ("tourists" ≠ "tourist").
 - **Muchos empates** entre BB-IDF y TF-IDF (≈ 19/30 en F1@10).
-- El corpus consta de 33 documentos; el archivo de consultas del repositorio
-  (`queries.json`) no se empleó en esta evaluación.
+- El corpus consta de 33 documentos (30 evaluables); el subdirectorio
+  `data/corpus/resumenes/` no se procesa.
 
 ---
 
@@ -472,7 +473,14 @@ results/
 └── INFORME_EXPERIMENTAL.md
 ```
 
-### Benchmark computacional (`main.py`)
+### Benchmark computacional (`main.py`) — LEGACY / OBSOLETO
+
+> Este benchmark es **obsoleto**. Emplea un ground truth de recuperación
+> auto-referencial (cada consulta es un documento del propio corpus y su
+> relevante es él mismo), por lo que sus métricas de ranking (MAP/MRR/nDCG)
+> **no discriminan calidad** entre algoritmos. No debe usarse para evaluar
+> keywords; la evaluación vigente es `bb_idf.experiment` (orquestada por
+> `run_all.py`). Se conserva únicamente por referencia histórica.
 
 ```bash
 uv run python main.py              # corrida única
@@ -481,12 +489,6 @@ uv run python main.py --graphs     # gráficos en results/benchmark/figures/
 uv run python main.py --scalability
 ```
 
-> El benchmark de `main.py` emplea un ground truth de recuperación
-> auto-referencial (cada consulta es un documento del propio corpus), por lo que
-> sus métricas de ranking no discriminan calidad entre algoritmos. Se usa para
-> comparar **eficiencia** (tiempos, memoria, dispersión); la evaluación de
-> **calidad** es la del experimento de keywords (§1).
-
 ---
 
 ## 12. Figuras (`results/figures/`)
@@ -494,7 +496,6 @@ uv run python main.py --scalability
 | Figura | Contenido |
 |---|---|
 | `prf_at_k.png` | P@K, R@K, F1@K de los 3 algoritmos (curvas con valores anotados) |
-| `f1_comparison.png` | F1@K por algoritmo (barras con valores) |
 | `f1_with_ci.png` | F1@K con intervalo de confianza 95% |
 | `improvement_bbidf.png` | Mejora % de BB-IDF vs TF-IDF (media ± SE) |
 | `per_doc_boxplot.png` | Distribución por documento (F1@10, AP) con puntos individuales |
@@ -503,8 +504,9 @@ uv run python main.py --scalability
 | `efficiency.png` | Tiempo total, tiempo/doc, memoria pico y throughput (panel 2×2) |
 | `quality_time_tradeoff.png` | F1@10 vs tiempo (escala log) |
 | `wordclouds.png` | **Nubes de palabras** de cada algoritmo (score acumulado) |
-| `keyword_frequency.png` | Top-20 términos más frecuentes en el Top-10 de cada algoritmo |
 | `similarity_to_textrank.png` | Similitud de ranking con TextRank (RBO) de TF-IDF vs BB-IDF |
+| `similarity_per_doc.png` | RBO@50 y Jaccard@50 vs TextRank por documento (TF-IDF vs BB-IDF) |
+| `gap_to_textrank_per_doc.png` | Gap de F1@10 a TextRank por documento (TF-IDF y BB-IDF) |
 
 ---
 
@@ -523,17 +525,16 @@ bb_idf/
 │   ├── plots.py          figuras + nubes de palabras
 │   └── robustness.py     robustez + análisis de casos
 ├── preprocessing/    Preprocessor spaCy (paquete original)
-├── evaluation/       benchmark computacional (paquete original)
-└── reporting/        gráficos/estadística del benchmark computacional
+├── evaluation/       LEGACY/obsoleto: benchmark computacional auto-referencial
+└── reporting/        LEGACY/obsoleto: gráficos/estadística del benchmark
 
-data/corpus/          PDFs (gitignored)
-data/qrels/           queries.json (referencia no empleada en esta evaluación)
+data/corpus/          PDFs (gitignored; incl. resumenes/ no procesado)
 notebooks/            notebooks de referencia (gitignored)
 nuevo/                propuesta original .docx + .ipynb (gitignored)
 results/              salidas del experimento
 docs/                 INFORME_EXPERIMENTAL.md, recomendaciones.txt
 tests/                pytest
-main.py               benchmark computacional
+main.py               benchmark computacional (LEGACY/obsoleto)
 run_all.py            genera todo de una vez
 ```
 

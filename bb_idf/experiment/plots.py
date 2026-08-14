@@ -8,7 +8,6 @@ Reads results from ``results/`` (CSV/JSON) and writes figures to
 from __future__ import annotations
 
 import json
-from collections import Counter
 from pathlib import Path
 
 import matplotlib as mpl
@@ -79,28 +78,6 @@ def plot_at_k_curves(resdir, outdir):
         ax.set_title(f"{metric}@K (media por documento)")
     axes[0].legend(loc="upper right")
     _save(fig, outdir, "prf_at_k")
-
-
-def plot_f1_comparison(resdir, outdir):
-    _style()
-    df = _load(Path(resdir) / "raw" / "per_doc_metrics.csv")
-    ks = [5, 10, 20, 50]
-    fig, ax = plt.subplots(figsize=(5.2, 3.2))
-    x = np.arange(len(ks))
-    width = 0.26
-    for i, algo in enumerate(["tfidf", "bbidf", "textrank"]):
-        sub = df.filter(pl.col("algorithm") == algo)
-        vals = [sub[f"F1@{k}"].mean() for k in ks]
-        bars = ax.bar(x + (i - 1) * width, vals, width, label=ALGO_LABELS[algo],
-                      color=ALGO_COLORS[algo], edgecolor="black", linewidth=0.4)
-        _annotate_bars(ax, bars, "{:.3f}", fontsize=6.5)
-    ax.set_xticks(x)
-    ax.set_xticklabels([f"K={k}" for k in ks])
-    ax.set_ylabel("F1@K (media)")
-    ax.set_ylim(0, 0.62)
-    ax.set_title("F1@K por algoritmo")
-    ax.legend()
-    _save(fig, outdir, "f1_comparison")
 
 
 def plot_improvement(resdir, outdir):
@@ -311,29 +288,54 @@ def plot_wordclouds(resdir, outdir):
     _save(fig, outdir, "wordclouds")
 
 
-def plot_keyword_frequency(resdir, outdir):
-    """Top-20 terms most often in each algorithm's Top-10 across documents."""
+def plot_similarity_per_doc(resdir, outdir):
+    """Per-document RBO@50 and Jaccard@50 vs TextRank (TF-IDF vs BB-IDF)."""
     _style()
-    kw = _load(Path(resdir) / "metrics" / "keywords_ranked.csv")
-    fig, axes = plt.subplots(1, 3, figsize=(15, 4.5))
-    for ax, algo in zip(axes, ["tfidf", "bbidf", "textrank"]):
-        sub = kw.filter(pl.col("algorithm") == algo)
-        counter = Counter()
-        for term in sub["term"].to_list():
-            counter[term] += 1
-        top = counter.most_common(20)
-        terms = [t for t, _ in top][::-1]
-        counts = [c for _, c in top][::-1]
-        ax.barh(range(len(terms)), counts, color=ALGO_COLORS[algo],
-                edgecolor="black", linewidth=0.3)
-        for i, c in enumerate(counts):
-            ax.text(c, i, f" {c}", va="center", fontsize=6.5)
-        ax.set_yticks(range(len(terms)))
-        ax.set_yticklabels(terms, fontsize=7)
-        ax.set_xlabel("Docs en Top-10")
-        ax.set_title(ALGO_LABELS[algo])
-    fig.suptitle("Frecuencia de keywords (top-20) en el Top-10", fontsize=12)
-    _save(fig, outdir, "keyword_frequency")
+    df = _load(Path(resdir) / "processed" / "similarity_to_textrank.csv")
+    labels = df.unique(subset=["doc_id"]).sort("doc_id")["doc"].to_list()
+    x = np.arange(len(labels))
+    width = 0.38
+    fig, axes = plt.subplots(2, 1, figsize=(10, 6), sharex=True)
+    for ax, metric in zip(axes, ["rbo", "jaccard"]):
+        sub = df.filter((pl.col("metric") == metric) & (pl.col("k") == 50)).sort("doc_id")
+        tf = sub.filter(pl.col("algo") == "tfidf")["similarity"].to_numpy()
+        bb = sub.filter(pl.col("algo") == "bbidf")["similarity"].to_numpy()
+        ax.bar(x - width / 2, tf, width, label="TF-IDF", color=ALGO_COLORS["tfidf"],
+               edgecolor="black", linewidth=0.3)
+        ax.bar(x + width / 2, bb, width, label="BB-IDF", color=ALGO_COLORS["bbidf"],
+               edgecolor="black", linewidth=0.3)
+        ax.set_ylabel(f"{metric.upper()}@50 vs TextRank")
+        ax.set_ylim(0, 1)
+        ax.axhline(0, color="black", lw=0.5)
+    axes[0].legend()
+    axes[1].set_xticks(x)
+    axes[1].set_xticklabels(labels, fontsize=6, rotation=90)
+    fig.suptitle("Similitud de ranking con TextRank por documento (K=50)", fontsize=12)
+    _save(fig, outdir, "similarity_per_doc")
+
+
+def plot_gap_per_doc(resdir, outdir):
+    """Per-document F1@10 gap to TextRank (TF-IDF and BB-IDF)."""
+    _style()
+    df = _load(Path(resdir) / "processed" / "gap_to_textrank.csv")
+    sub = df.filter(pl.col("metric") == "F1@10").sort("doc_id")
+    labels = [f"doc{int(d) + 1}" for d in sub["doc_id"].to_list()]
+    tf_gap = (sub["tfidf"] - sub["textrank"]).to_numpy()
+    bb_gap = sub["bbidf_gap_to_textrank"].to_numpy()
+    x = np.arange(len(labels))
+    width = 0.38
+    fig, ax = plt.subplots(figsize=(10, 3.4))
+    ax.bar(x - width / 2, tf_gap, width, label="TF-IDF − TextRank",
+           color=ALGO_COLORS["tfidf"], edgecolor="black", linewidth=0.3)
+    ax.bar(x + width / 2, bb_gap, width, label="BB-IDF − TextRank",
+           color=ALGO_COLORS["bbidf"], edgecolor="black", linewidth=0.3)
+    ax.axhline(0, color="black", lw=0.8)
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=6, rotation=90)
+    ax.set_ylabel("F1@10 − TextRank (diferencia por documento)")
+    ax.set_title("Gap a TextRank por documento (F1@10)")
+    ax.legend()
+    _save(fig, outdir, "gap_to_textrank_per_doc")
 
 
 def plot_all(resdir="results", outdir=None):
@@ -341,7 +343,6 @@ def plot_all(resdir="results", outdir=None):
     _style()
     print("Generando figuras...")
     plot_at_k_curves(resdir, outdir)
-    plot_f1_comparison(resdir, outdir)
     plot_improvement(resdir, outdir)
     plot_per_doc_boxplot(resdir, outdir)
     plot_efficiency(resdir, outdir)
@@ -350,7 +351,8 @@ def plot_all(resdir="results", outdir=None):
     plot_ci(resdir, outdir)
     plot_paired_diff(resdir, outdir)
     plot_wordclouds(resdir, outdir)
-    plot_keyword_frequency(resdir, outdir)
+    plot_similarity_per_doc(resdir, outdir)
+    plot_gap_per_doc(resdir, outdir)
     print(f"  Figuras guardadas en {outdir}/")
 
 

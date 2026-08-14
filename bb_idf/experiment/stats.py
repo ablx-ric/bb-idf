@@ -53,7 +53,7 @@ def rank_biserial(a: np.ndarray, b: np.ndarray) -> float:
 
 def bootstrap_mean_diff_ci(a: np.ndarray, b: np.ndarray, n_boot: int = 10_000,
                            seed: int = 0) -> dict:
-    """95% BCa-like percentile CI for the mean of (b - a)."""
+    """95% percentile bootstrap CI for the mean of (b - a)."""
     rng = np.random.default_rng(seed)
     a = np.asarray(a, dtype=float)
     b = np.asarray(b, dtype=float)

@@ -297,17 +297,17 @@ frecuencia, más próximo al comportamiento de TextRank que al de TF-IDF.
 ## 17. Visualizaciones (`results/figures/`)
 
 1. `prf_at_k.png` — P/R/F1@K de los 3 algoritmos (valores anotados).
-2. `f1_comparison.png` — barras F1@K (valores anotados).
-3. `improvement_bbidf.png` — mejora % de BB-IDF vs TF-IDF (media ± SE).
-4. `per_doc_boxplot.png` — distribución por documento (F1@10, AP) con puntos individuales.
-5. `efficiency.png` — tiempo total, tiempo/doc, memoria pico y throughput (panel 2×2).
-6. `quality_time_tradeoff.png` — F1@10 vs tiempo (escala log).
-7. `heatmap_f1_doc.png` — F1@10 por documento × algoritmo (valores en celdas).
-8. `f1_with_ci.png` — medias F1@K con IC 95%.
-9. `paired_diff_f1.png` — histograma de diferencias pareadas (BB-IDF − TF-IDF).
-10. `wordclouds.png` — **nubes de palabras** de cada algoritmo (score acumulado).
-11. `keyword_frequency.png` — top-20 términos más frecuentes en el Top-10 de cada algoritmo.
-12. `similarity_to_textrank.png` — similitud de ranking con TextRank (RBO) de TF-IDF vs BB-IDF.
+2. `improvement_bbidf.png` — mejora % de BB-IDF vs TF-IDF (media ± SE).
+3. `per_doc_boxplot.png` — distribución por documento (F1@10, AP) con puntos individuales.
+4. `efficiency.png` — tiempo total, tiempo/doc, memoria pico y throughput (panel 2×2).
+5. `quality_time_tradeoff.png` — F1@10 vs tiempo (escala log).
+6. `heatmap_f1_doc.png` — F1@10 por documento × algoritmo (valores en celdas).
+7. `f1_with_ci.png` — medias F1@K con IC 95%.
+8. `paired_diff_f1.png` — histograma de diferencias pareadas (BB-IDF − TF-IDF).
+9. `wordclouds.png` — **nubes de palabras** de cada algoritmo (score acumulado).
+10. `similarity_to_textrank.png` — similitud de ranking con TextRank (RBO) de TF-IDF vs BB-IDF.
+11. `similarity_per_doc.png` — RBO@50 y Jaccard@50 vs TextRank por documento.
+12. `gap_to_textrank_per_doc.png` — gap de F1@10 a TextRank por documento.
 
 Las nubes de palabras (`wordclouds.png`) permiten la comparación cualitativa
 visual de qué términos prioriza cada método: TF-IDF tiende a términos
@@ -355,8 +355,8 @@ documentos con contenido no temático (planes de negocio, metodología).
 5. **La mejora depende de K y no sobrevive a Holm**: nominalmente significativa
    solo en K=10 (p = 0.006 → p_adj = 0.105). No es un resultado robusto.
 6. **El filtro duro de banda es inviable** con umbrales actuales (ver §20).
-7. El corpus consta de 33 documentos; el archivo de consultas del repositorio
-   (`queries.json`) no se empleó en esta evaluación.
+7. El corpus consta de 33 documentos (30 evaluables); el subdirectorio
+   `data/corpus/resumenes/` no se procesa.
 8. No hay anotación humana independiente (el gold es el de los autores, que es
    la referencia más defendible disponible, pero no un juicio de expertos).
 

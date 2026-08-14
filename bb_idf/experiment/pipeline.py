@@ -11,6 +11,8 @@ that artifact via ``preprocess_corpus`` instead of re-tokenizing.
 from __future__ import annotations
 
 import functools
+import hashlib
+import inspect
 import pickle
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -135,25 +137,47 @@ class PreprocessedCorpus:
     excluded: list[int] = field(default_factory=list)
 
 
+def _preprocess_signature() -> str:
+    """Fingerprint of the preprocessing + gold logic, used to invalidate the
+    on-disk cache when the code (not just the corpus) changes."""
+    from bb_idf.experiment import gold as gold_module
+
+    parts = [
+        inspect.getsource(preprocess),
+        inspect.getsource(normalize_gold),
+        inspect.getsource(gold_module),
+    ]
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+
 def preprocess_corpus(corpus_dir: str | Path,
                       cache_dir: str | Path = "data/processed") -> PreprocessedCorpus:
     """Load (or compute + cache) the preprocessed corpus.
 
     spaCy runs only when the cache is missing or the corpus changed; otherwise
-    the artifact is read from ``cache_dir/preprocessed.pkl``.
+    the artifact is read from ``cache_dir/preprocessed.pkl``. The cache is
+    keyed by both the sorted filenames and a signature of the preprocessing and
+    gold code, so editing ``preprocess``, ``normalize_gold`` or ``gold.py``
+    forces a re-preprocessing.
     """
     documents = load_documents(corpus_dir)
     filenames = [f for f, _ in documents]
+    signature = _preprocess_signature()
 
     cache_path = Path(cache_dir) / "preprocessed.pkl"
     if cache_path.exists():
         try:
             with open(cache_path, "rb") as fh:
-                cached: PreprocessedCorpus = pickle.load(fh)
-            cached_names = [f for f, _ in cached.documents]
-            if cached_names == filenames:
-                return cached
-            print("Cache obsoleta (corpus cambiado), re-preprocesando...")
+                cached = pickle.load(fh)
+            if isinstance(cached, tuple) and len(cached) == 2:
+                cached_sig, cached_corpus = cached
+            else:
+                # Legacy cache without signature: recompute once.
+                cached_sig, cached_corpus = None, cached
+            cached_names = [f for f, _ in cached_corpus.documents]
+            if cached_sig == signature and cached_names == filenames:
+                return cached_corpus
+            print("Cache obsoleta (lógica o corpus cambiado), re-preprocesando...")
         except Exception:
             print("Cache ilegible, re-preprocesando...")
 
@@ -168,5 +192,5 @@ def preprocess_corpus(corpus_dir: str | Path,
     )
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     with open(cache_path, "wb") as fh:
-        pickle.dump(result, fh)
+        pickle.dump((signature, result), fh)
     return result
