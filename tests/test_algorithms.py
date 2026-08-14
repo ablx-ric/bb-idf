@@ -83,22 +83,40 @@ class TestBBIDF:
         with pytest.raises(ValueError):
             vec.transform(["hola"])
 
-    def test_band_filter_passes_relevant_terms(self):
-        """Terminos con TF dentro de la banda reciben score positivo."""
-        docs = ["turismo turismo naturaleza aventura turismo",
-                 "ruinas ruinas arqueologia ruinas historia"]
-        vec = BBIDF()
-        X = vec.fit_transform(docs)
-        assert X[0, vec._vocabulary["turismo"]] > 0
-        assert X[1, vec._vocabulary["ruinas"]] > 0
+    def test_no_hard_zeroing(self):
+        """Definicion validada: los terminos fuera de banda NO se anulan.
 
-    def test_band_filter_removes_noise(self):
-        """TF=1 no pasa la banda [1.5, 4.5] de docs cortos -> score cero."""
+        Solo cambia el IDF (df -> df_banda); todo termino presente (tf > 0)
+        conserva peso positivo.
+        """
         docs = ["turismo turismo naturaleza",
                  "naturaleza naturaleza turismo"]
         vec = BBIDF()
         X = vec.fit_transform(docs)
         assert X[0, vec._vocabulary["turismo"]] > 0
-        assert X[0, vec._vocabulary["naturaleza"]] == 0.0
+        assert X[0, vec._vocabulary["naturaleza"]] > 0
         assert X[1, vec._vocabulary["naturaleza"]] > 0
-        assert X[1, vec._vocabulary["turismo"]] == 0.0
+        assert X[1, vec._vocabulary["turismo"]] > 0
+
+    def test_matches_experiment_definition(self):
+        """La clase empaquetada y scorers.bbidf_weights producen lo mismo."""
+        from bb_idf.experiment import scorers
+
+        docs = ["turismo turismo naturaleza aventura turismo",
+                 "ruinas ruinas arqueologia ruinas historia",
+                 "turismo ruinas historia"]
+        vec = BBIDF()
+        W_class = vec.fit_transform(docs)
+        X_counts = vec.vectorizer.transform(docs).toarray()
+        W_ref = scorers.bbidf_weights(X_counts)
+        assert np.allclose(W_class, W_ref)
+
+    def test_idf_uses_smooth_formula(self):
+        """idf(t) = ln((1+N)/(1+df_banda(t))) + 1."""
+        docs = ["hola mundo", "hola hola"]
+        vec = BBIDF()
+        vec.fit(docs)
+        n_docs = len(docs)
+        for term, idx in vec._vocabulary.items():
+            expected = np.log((1.0 + n_docs) / (1.0 + vec._df_banda[idx])) + 1.0
+            assert np.isclose(vec._idf[idx], expected)

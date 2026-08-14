@@ -84,8 +84,8 @@ PageRank. El grafo es una matriz de adyacencia `U_d × U_d` (nodos = términos
 
 **Conclusión asintótica:** TextRank es **cuadrático en el número de términos
 únicos por documento** (`Ū²`). Como `Ū` crece con la longitud del documento, el
-coste por documento crece de forma **superlineal**. Esto explica el ~980×
-medido respecto a TF-IDF (y ~460× respecto a BB-IDF).
+coste por documento crece de forma **superlineal**. Esto explica el ~740×
+medido respecto a TF-IDF (y ~420× respecto a BB-IDF).
 
 ---
 
@@ -99,16 +99,16 @@ medido respecto a TF-IDF (y ~460× respecto a BB-IDF).
 
 ---
 
-## 6. Confirmación empírica (33 documentos)
+## 6. Confirmación empírica (33 documentos; media ± std, N = 10)
 
 | Algoritmo | Tiempo total | Tiempo/doc | Factor vs TF-IDF |
 |---|---|---|---|
-| TF-IDF | 0.0042 s | 0.00013 s | 1× |
-| BB-IDF | 0.0089 s | 0.00027 s | ~2.1× |
-| TextRank | 4.117 s | 0.125 s | ~980× |
+| TF-IDF | 0.0054 ± 0.0005 s | 0.00016 s | 1× |
+| BB-IDF | 0.0095 ± 0.0009 s | 0.00029 s | ~1.8× |
+| TextRank | 3.99 ± 0.02 s | 0.121 s | ~740× |
 
-El factor ~2.1× de BB-IDF corresponde al **overhead constante** del filtro de
-banda, coherente con el mismo orden O(N·V). El factor ~980× de TextRank
+El factor ~1.8× de BB-IDF corresponde al **overhead constante** del filtro de
+banda, coherente con el mismo orden O(N·V). El factor ~740× de TextRank
 corresponde a su coste **cuadrático por documento**.
 
 > Nota: el preprocesado (spaCy) es O(N·L̄) y es **compartido** por los tres
@@ -121,7 +121,7 @@ corresponde a su coste **cuadrático por documento**.
 
 BB-IDF **no introduce coste asintótico adicional** frente a TF-IDF: ambos son
 lineales en `N` y `V`; la única diferencia es un factor constante pequeño
-(~2×). En cambio, TextRank paga un coste **cuadrático por documento** (grafo de
+(~1.8×). En cambio, TextRank paga un coste **cuadrático por documento** (grafo de
 co-ocurrencia + PageRank), lo que lo hace varios órdenes de magnitud más caro
 en documentos largos. Por tanto, en términos de complejidad, BB-IDF conserva la
 escalabilidad de TF-IDF y es asintóticamente mucho más eficiente que TextRank.

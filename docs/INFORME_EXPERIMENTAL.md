@@ -16,11 +16,13 @@ inventado).
 **Hallazgo principal:** BB-IDF —definido como TF-IDF donde únicamente el conteo
 de frecuencia documental `df(t)` se reemplaza por un `df` filtrado por banda
 estadística— mejora a TF-IDF de forma **modesta y acotada**: la mejora es
-estadísticamente significativa en **F1@10 y R@10** (p = 0.006, d ≈ 0.56), pero
-no significativa en K = 5, 20 o 50, ni en MAP/MRR. BB-IDF queda **a la par de
-TextRank** (sin diferencias significativas) y, en F1@10, lo iguala o supera
-ligeramente. Además se detectó que la variante de BB-IDF con **filtro duro de
-banda** (la que implementa `bb_idf/algorithms/bbidf.py`) produce resultados
+**nominalmente** significativa en **F1@10 y R@10** (p = 0.006, d ≈ 0.56), pero
+**no sobrevive a la corrección de Holm** por las 18 métricas exploradas
+(p_adj = 0.105), y no es significativa en K = 5, 20 o 50, ni en MAP/MRR. BB-IDF
+queda **a la par de TextRank** (sin diferencias significativas) y, en F1@10, lo
+iguala o supera ligeramente. Además se detectó que la variante de BB-IDF con
+**filtro duro de banda** (anular los pesos fuera de banda, conservada solo para
+el análisis de robustez en `scorers.py::bbidf_weights_hard`) produce resultados
 **catastróficos** (F1@10 ≈ 0.04), porque los umbrales de banda anulan ~91% de
 los términos en documentos largos.
 
@@ -29,12 +31,14 @@ los términos en documentos largos.
 ## 2. Corpus
 
 - **N = 33 documentos PDF** (tesis y artículos de turismo; región
-  Amazonas/Chachapoyas, Perú).
-- **31/33** documentos declaran "Palabras clave(s)"/"Keywords" del autor.
-  2 documentos sin keywords (`La (re)construcción de Chachapoyas.pdf`,
-  `Planeamiento Estratégico...pdf`) → excluidos del gold standard.
-- **30 documentos** forman el conjunto de evaluación (31 con keywords − 1
-  excluido por keywords en inglés con cuerpo en español, ver §3).
+  Amazonas/Chachapoyas, Perú). El subdirectorio `data/corpus/resumenes/`
+  (33 resúmenes en PDF) **no se procesa**: `load_documents` usa `glob("*.pdf")`
+  no recursivo.
+- **30/33** documentos declaran "Palabras clave(s)"/"Keywords" del autor.
+  3 documentos sin keywords (`La (re)construcción de Chachapoyas.pdf`,
+  `PERCEPCION DEL DESTINO CHACHAPOYAS.pdf`, `Planeamiento Estratégico...pdf`)
+  → excluidos del gold standard.
+- **30 documentos** forman el conjunto de evaluación (30 con keywords).
 - Longitud: media 5 461 tokens, mediana 5 195, rango 879–15 782 (tras
   preprocesado).
 - Gold: media 6.5 términos por documento (mediana 6, rango 4–14).
@@ -118,9 +122,10 @@ cuerpo en español y keywords solo en inglés fue traducido fielmente, ver
 | Selección de keywords | Top-K por peso descendente (desempate por orden alfabético) |
 | K | 5, 10, 20, 50 |
 | Métricas | P@K, R@K, F1@K, AP, MRR, nDCG@K |
-| Comparación principal | BB-IDF vs TF-IDF (pareada por documento) |
+| Comparación principal | BB-IDF vs TF-IDF (pareada por documento; desenlace primario F1@10) |
 | Comparación secundaria | BB-IDF/TF-IDF vs TextRank (benchmark) |
-| Estadística | Wilcoxon signed-rank (pareado), bootstrap CI 95%, Cohen's d (pareado), rank-biserial |
+| Estadística | Wilcoxon signed-rank (pareado), bootstrap CI 95%, Cohen's d (pareado), rank-biserial, Holm-Bonferroni |
+| Eficiencia | tiempo, throughput y memoria pico (tracemalloc), media ± std sobre N = 10 repeticiones |
 | Semilla | 0 (bootstrap) |
 | Salida | `results/{raw,processed,metrics,statistical,figures,tables}` |
 
@@ -129,11 +134,12 @@ cuerpo en español y keywords solo en inglés fue traducido fielmente, ver
    `df → df_banda` (misma fórmula IDF y mismo TF). De este modo, cualquier
    diferencia observada es atribuible al filtro de banda y no a cambios en la
    fórmula de IDF o en la normalización de TF.
-2. **Gold = keywords de autores** (disponibles en 31/33 PDFs), en lugar de un
+2. **Gold = keywords de autores** (disponibles en 30/33 PDFs), en lugar de un
    ground truth de recuperación de documentos que no discriminaba entre
    algoritmos.
-3. **Exclusión** de 3 documentos sin gold utilizable (2 sin keywords; 1 con
-   keywords en inglés y cuerpo en español → se tradujo, quedando 30).
+3. **Exclusión** de 3 documentos sin keywords declaradas (`La (re)construcción
+   de Chachapoyas.pdf`, `PERCEPCION DEL DESTINO CHACHAPOYAS.pdf`,
+   `Planeamiento Estratégico...pdf`), quedando 30 evaluables.
 4. **nDCG@K** se reporta en los datos crudos; al ser relevancia binaria y
    pocos relevantes, es casi redundante con P@K y no se usa en conclusiones.
 
@@ -223,23 +229,25 @@ El **p-value** indica la probabilidad de observar la diferencia bajo la hipótes
 nula (α = 0.05); el **tamaño del efecto** se reporta con **Cohen's d** pareado
 (0.2 pequeño, 0.5 medio, 0.8 grande) y el **IC 95%** se obtiene por bootstrap.
 
-| Métrica | p | Cohen's d | n pares (dif ≠ 0) | IC 95% diff |
-|---|---|---|---|---|
-| F1@10 | **0.006** | +0.56 | 11 | [+0.016, +0.065] |
-| R@10 | **0.006** | +0.56 | 11 | [+0.021, +0.085] |
-| P@10 | 0.025 | +0.55 | 11 | [+0.013, +0.053] |
-| F1@5 | 0.266 | +0.10 | 9 | [−0.025, +0.047] |
-| F1@20 | 0.750 | −0.04 | 4 | — |
-| F1@50 | 0.625 | +0.02 | 4 | — |
-| MAP | 0.584 | +0.16 | 30 | [−0.013, +0.037] |
-| MRR | 0.899 | +0.03 | 14 | — |
+| Métrica | p | p (Holm) | Cohen's d | n pares (dif ≠ 0) | IC 95% diff |
+|---|---|---|---|---|---|
+| F1@10 | **0.006** | 0.105 | +0.56 | 11 | [+0.016, +0.065] |
+| R@10 | **0.006** | 0.105 | +0.56 | 11 | [+0.021, +0.085] |
+| P@10 | 0.025 | 0.406 | +0.55 | 11 | [+0.013, +0.053] |
+| F1@5 | 0.266 | 1.0 | +0.10 | 9 | [−0.025, +0.047] |
+| F1@20 | 0.750 | 1.0 | −0.04 | 4 | — |
+| F1@50 | 0.625 | 1.0 | +0.02 | 4 | — |
+| MAP | 0.584 | 1.0 | +0.16 | 30 | [−0.013, +0.037] |
+| MRR | 0.899 | 1.0 | +0.03 | 14 | — |
 
-**Interpretación:** la mejora es estadísticamente significativa **solo en
-K=10** (P@10, R@10, F1@10). Tratando F1@10 como desenlace primario, p = 0.006
-(no requiere corrección). Si se corrigiera por las 10 métricas exploradas
-(Holm), F1@10 y R@10 quedarían en el límite (p_adj ≈ 0.05); el resto no
-sobrevive. El bajo número de pares no empatados en K=5/20/50 limita la
-potencia (muchos empates).
+**Interpretación:** la mejora es **nominalmente** significativa **solo en
+K=10** (P@10, R@10, F1@10). Sin embargo, al corregir por las **18 métricas**
+exploradas de la comparación principal (Holm-Bonferroni), **ninguna sobrevive**:
+F1@10 y R@10 pasan a p_adj = 0.105 (≥ 0.05) y P@10 a p_adj = 0.406. Es decir,
+la aparente mejora en K=10 **no es estadísticamente significativa tras el
+control por comparaciones múltiples**. El bajo número de pares no empatados
+(11 de 30) y la dependencia del resultado respecto de K refuerzan que la
+conclusión es **exploratoria**.
 
 ## 15. Tamaño del efecto
 
@@ -249,19 +257,21 @@ potencia (muchos empates).
   consistente: donde hay diferencia, BB-IDF casi siempre gana).
 - El efecto no es uniforme: concentrado en ~1/3 de los documentos.
 
-## 16. Eficiencia
+## 16. Eficiencia (media ± std, N = 10 repeticiones)
 
 | Métrica | TF-IDF | BB-IDF | TextRank |
 |---|---|---|---|
-| Tiempo total | ~0.004 s | ~0.009 s | ~5 s |
-| Throughput | ~4 200 docs/s | ~2 200 docs/s | ~6 docs/s |
+| Tiempo total | 0.0054 ± 0.0005 s | 0.0095 ± 0.0009 s | 3.99 ± 0.02 s |
+| Throughput | ~6 100 docs/s | ~3 500 docs/s | ~8 docs/s |
 | Memoria pico (tracemalloc) | ~8.5 MB | ~8.5 MB | ~102 MB |
-| Factor tiempo vs TF-IDF | 1× | **~2×** | **~1000×** |
+| Factor tiempo vs TF-IDF | 1× | **~1.8×** | **~740×** |
 
 (Preprocesado spaCy: ~60 s, único, compartido y cacheado; no incluido en los
-tiempos.) BB-IDF cuesta ~2× TF-IDF (cálculo de banda y conteo filtrado);
-TextRank es ~3 órdenes de magnitud más caro y ~12× más memoria (grafo de
-co-ocurrencia por documento). El análisis de complejidad asintótica está en
+tiempos. El tiempo por documento y las series por documento están en
+`results/raw/per_doc_times.csv` y en cada `results/per_document/docX/timing.csv`.)
+BB-IDF cuesta ~1.8× TF-IDF (cálculo de banda y conteo filtrado); TextRank es
+~740× más caro y ~12× más memoria (grafo de co-ocurrencia por documento).
+El análisis de complejidad asintótica está en
 [docs/analisis_complejidad.md](docs/analisis_complejidad.md): TF-IDF y BB-IDF
 son O(N·V); TextRank es O(N·(L̄·W + I·Ū²)).
 
@@ -274,7 +284,7 @@ calidad). Métricas: **RBO** (Rank-Biased Overlap, p=0.9), **Jaccard@K** y
 
 | Métrica | TF-IDF | BB-IDF | p (pareado) | Cohen's d |
 |---|---|---|---|---|
-| RBO@10 | 0.401 | **0.459** | 0.0002 | +0.71 |
+| RBO@10 | 0.615 | **0.705** | 0.0002 | +0.71 |
 | Jaccard@10 | 0.594 | **0.686** | 0.0003 | +0.86 |
 | Overlap@10 | 0.727 | **0.800** | 0.0006 | +0.78 |
 
@@ -342,8 +352,8 @@ documentos con contenido no temático (planes de negocio, metodología).
    penalizando ese documento por igual a los 3 métodos.
 4. **Empates masivos**: BB-IDF y TF-IDF empatan en ~19/30 docs en F1@10; la
    mejora es real solo en un subconjunto.
-5. **La mejora depende de K**: significativa solo en K=10. No es un resultado
-   robusto a todos los K.
+5. **La mejora depende de K y no sobrevive a Holm**: nominalmente significativa
+   solo en K=10 (p = 0.006 → p_adj = 0.105). No es un resultado robusto.
 6. **El filtro duro de banda es inviable** con umbrales actuales (ver §20).
 7. El corpus consta de 33 documentos; el archivo de consultas del repositorio
    (`queries.json`) no se empleó en esta evaluación.
@@ -354,25 +364,27 @@ documentos con contenido no temático (planes de negocio, metodología).
 
 **Resultados observados (con 30 documentos):**
 - BB-IDF (solo-df) mejora a TF-IDF en **F1@10: 0.437 → 0.477 (+10.3%)**, y en
-  R@10/P@10, de forma **estadísticamente significativa** (p = 0.006, d = 0.56).
+  R@10/P@10, de forma **nominalmente significativa** (p = 0.006, d = 0.56),
+  pero **no sobrevive a la corrección de Holm** (p_adj = 0.105).
 - La mejora **no es significativa** en K = 5, 20, 50, ni en MAP/MRR.
 - BB-IDF está **a la par de TextRank** (sin diferencias significativas), y lo
   supera ligeramente en F1@10.
-- La variante de BB-IDF con **filtro duro de banda** (la de `bbidf.py`)
-  colapsa (F1@10 ≈ 0.04) porque los umbrales anulan ~91% de términos.
+- La variante de BB-IDF con **filtro duro de banda** (anular los pesos fuera de
+  banda) colapsa (F1@10 ≈ 0.04) porque los umbrales anulan ~91% de términos.
 
 **Respuestas directas:**
 1. **¿BB-IDF mejora a TF-IDF?** Sí, pero **modestamente** y **solo en K=10**
    (y en R@10/P@10); en el resto de configuraciones es indistinguible.
 2. **¿Cuánto?** F1@10: +10.3% de media (de 0.437 a 0.477), con efecto
    moderado (d = 0.56). La mediana de mejora es 0% (muchos empates).
-3. **¿Es significativa?** Sí en F1@10/R@10 (p = 0.006); no en K=5/20/50/MAP/MRR.
+3. **¿Es significativa?** **Nominalmente** en F1@10/R@10 (p = 0.006), pero
+   **no tras la corrección de Holm** (p_adj = 0.105); no en K=5/20/50/MAP/MRR.
 4. **¿Es consistente?** No: gana en 10/30, empata en 19/30, pierde en 1/30.
    La ventaja se concentra en documentos con keywords específicas frecuentes.
 5. **¿Qué tan cerca está BB-IDF de TextRank?** A la par; F1@10 = 102% del
    desempeño de TextRank, MAP = 98%, MRR = 90%.
-6. **¿Costo computacional?** ~2× el de TF-IDF (0.009 s vs 0.004 s para 33
-   docs); ~3 órdenes de magnitud más barato que TextRank (4.1 s).
+6. **¿Costo computacional?** ~1.8× el de TF-IDF (0.0095 s vs 0.0054 s para 33
+   docs, media de 10 corridas); ~420× más barato que TextRank (3.99 s).
 
 **Interpretación:** el filtro de banda, aplicado *solo* al conteo de `df`,
 equivale en la práctica a aplanar el IDF hacia casi-constante (91% de términos
@@ -383,26 +395,30 @@ es pequeño y dependiente de K.
 
 **Qué NO puede sostenerse con 30 documentos:** que BB-IDF sea globalmente
 superior a TF-IDF o a TextRank; cualquier extrapolación a otros dominios; que
-la mejora sea grande o universal. La versión con filtro duro (la implementada
-en el paquete) **no** es superior: es inviable con los umbrales de banda
-actuales, y debería revisarse antes de cualquier uso.
+la mejora sea grande o universal; que la mejora en K=10 sea estadísticamente
+significativa tras corrección por comparaciones múltiples. La variante con
+filtro duro (anular los pesos fuera de banda) **no** es superior: es inviable
+con los umbrales de banda actuales, y debería descartarse.
 
 ---
 
 ## Archivos generados
 
 - `results/raw/per_doc_metrics.csv` — métricas por documento/algoritmo/K.
+- `results/raw/per_doc_times.csv` — tiempo de scoring por documento/algoritmo.
 - `results/processed/summary.csv`, `per_doc_wide.csv` (una fila por documento),
   `improvement_bbidf_vs_tfidf.csv`, `gap_to_textrank.csv`.
-- `results/statistical/paired_tests.csv`, `robustness.csv`,
-  `band_diagnostic.csv`.
+- `results/statistical/paired_tests.csv` (con `p_holm`), `similarity_tests.csv`,
+  `robustness.csv`, `band_diagnostic.csv`.
 - `results/metrics/keywords_ranked.csv` (ranking completo con score),
-  `top10_keywords.csv`.
+  `top10_keywords.csv`, `top5_keywords.csv`, `top50_keywords.csv` (documento,
+  algoritmo, rank, keyword, score).
 - `results/tables/case_analysis.md`, `per_document.md` (ranking Top-10 por
   documento con gold resaltado).
 - `results/per_document/doc1/…doc33/` — por documento: top-50 keywords por
-  algoritmo (`tfidf.csv`, `bbidf.csv`, `textrank.csv`, con score L2 + raw) y
-  nube de palabras por algoritmo; `documents_index.csv` mapea `docX` al archivo
+  algoritmo (`tfidf.csv`, `bbidf.csv`, `textrank.csv`, con score L2 + raw),
+  nube de palabras por algoritmo, `similarity_textrank.csv` (RBO/Jaccard/Overlap
+  vs TextRank) y `timing.csv`; `documents_index.csv` mapea `docX` al archivo
   original.
 - `results/figures/*.png` (12 figuras, incl. nubes de palabras, frecuencia y
   similitud con TextRank).
@@ -410,5 +426,6 @@ actuales, y debería revisarse antes de cualquier uso.
   `results/statistical/similarity_tests.csv` — análisis suplementario de
   similitud de ranking con TextRank.
 - `results/benchmark/` — salida del benchmark computacional (`main.py`).
-- `results/metadata.json` — configuración, tiempos, throughput y memoria.
+- `results/metadata.json` — configuración, tiempos/memoria (media ± std) y
+  throughput.
 - `docs/analisis_complejidad.md` — análisis de complejidad Big-O comparativo.

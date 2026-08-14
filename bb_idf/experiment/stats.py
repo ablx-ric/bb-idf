@@ -70,6 +70,27 @@ def bootstrap_mean_diff_ci(a: np.ndarray, b: np.ndarray, n_boot: int = 10_000,
     }
 
 
+def holm_bonferroni(p_values) -> np.ndarray:
+    """Holm-Bonferroni step-down adjusted p-values (familywise error control).
+
+    Accepts an array-like of raw p-values and returns adjusted p-values in the
+    same order, each clipped to [0, 1]. The correction is applied to a family of
+    tests (e.g. the metric × K grid of the primary comparison).
+    """
+    p = np.asarray(p_values, dtype=float)
+    n = p.size
+    if n == 0:
+        return p
+    order = np.argsort(p, kind="stable")
+    rank = np.empty(n, dtype=int)
+    rank[order] = np.arange(1, n + 1)
+    adj = np.minimum(1.0, (n - rank + 1) * p)
+    cummax = np.maximum.accumulate(adj[order])
+    out = np.empty(n, dtype=float)
+    out[order] = cummax
+    return out
+
+
 def describe(x: np.ndarray) -> dict:
     x = np.asarray(x, dtype=float)
     return {

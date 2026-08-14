@@ -159,30 +159,34 @@ def plot_efficiency(resdir, outdir):
     pdoc = meta["per_doc_time_s"]
     order = ["tfidf", "bbidf", "textrank"]
     mem = meta.get("peak_memory_kb", {})
+    mem_std = meta.get("peak_memory_std_kb", {})
+    fit_std = meta.get("fit_time_std_s", {})
     thr = meta.get("throughput_docs_per_s", {})
     fig, axes = plt.subplots(2, 2, figsize=(9, 6))
     # Tiempo total
     bars = axes[0, 0].bar(order, [fit[a] for a in order],
+                          yerr=[fit_std.get(a, 0.0) for a in order], capsize=3,
                           color=[ALGO_COLORS[a] for a in order],
                           edgecolor="black", linewidth=0.4)
     _annotate_bars(axes[0, 0], bars, "{:.4f}s", fontsize=6.5)
     axes[0, 0].set_ylabel("Tiempo total (s)")
-    axes[0, 0].set_title("Tiempo de ajuste")
+    axes[0, 0].set_title("Tiempo de ajuste (media ± std)")
     # Tiempo por documento
     bars = axes[0, 1].bar(order, [pdoc[a] for a in order],
                           color=[ALGO_COLORS[a] for a in order],
                           edgecolor="black", linewidth=0.4)
     _annotate_bars(axes[0, 1], bars, "{:.5f}s", fontsize=6.5)
     axes[0, 1].set_ylabel("Tiempo por documento (s)")
-    axes[0, 1].set_title("Costo por documento")
+    axes[0, 1].set_title("Costo por documento (amortizado)")
     # Pico de memoria
     if mem:
         bars = axes[1, 0].bar(order, [mem[a] for a in order],
+                              yerr=[mem_std.get(a, 0.0) for a in order], capsize=3,
                               color=[ALGO_COLORS[a] for a in order],
                               edgecolor="black", linewidth=0.4)
         _annotate_bars(axes[1, 0], bars, "{:.0f} KB", fontsize=6.5)
     axes[1, 0].set_ylabel("Memoria pico (KB)")
-    axes[1, 0].set_title("Memoria pico (tracemalloc)")
+    axes[1, 0].set_title("Memoria pico (tracemalloc, media ± std)")
     # Throughput
     if thr:
         bars = axes[1, 1].bar(order, [thr[a] for a in order],
@@ -190,7 +194,7 @@ def plot_efficiency(resdir, outdir):
                               edgecolor="black", linewidth=0.4)
         _annotate_bars(axes[1, 1], bars, "{:.0f} docs/s", fontsize=6.5)
     axes[1, 1].set_ylabel("Docs por segundo")
-    axes[1, 1].set_title("Throughput (n_docs / fit_time)")
+    axes[1, 1].set_title("Throughput (n_docs / fit_time medio)")
     for ax in axes.flat:
         ax.set_xticks(range(len(order)), [ALGO_LABELS[a] for a in order])
     _save(fig, outdir, "efficiency")

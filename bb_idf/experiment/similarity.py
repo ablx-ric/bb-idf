@@ -33,7 +33,16 @@ P = 0.9  # RBO persistence
 
 
 def rbo_at_k(a: list[str], b: list[str], k: int, p: float = P) -> float:
-    """Rank-Biased Overlap truncated at depth k (Webber et al. 2010)."""
+    """Rank-Biased Overlap at depth k (Webber et al. 2010), truncated and
+    renormalized so that identical lists give 1.0.
+
+    RBO@k = sum_{d=1..k} p^(d-1) * |S_{:d} ∩ T_{:d}| / d
+            divided by sum_{d=1..k} p^(d-1)
+
+    This is the renormalized truncated RBO (not the extrapolated infinite
+    version): it ranks lists correctly but its range is [0, 1] only after the
+    denominator normalization below.
+    """
     set_a: set[str] = set()
     set_b: set[str] = set()
     acc = 0.0
@@ -43,7 +52,8 @@ def rbo_at_k(a: list[str], b: list[str], k: int, p: float = P) -> float:
         if d <= len(b):
             set_b.add(b[d - 1])
         acc += (p ** (d - 1)) * (len(set_a & set_b) / d)
-    return (1.0 - p) * acc
+    denom = (1.0 - p ** k) / (1.0 - p) if p < 1.0 else float(k)
+    return acc / denom if denom > 0 else 0.0
 
 
 def jaccard_at_k(a: list[str], b: list[str], k: int) -> float:

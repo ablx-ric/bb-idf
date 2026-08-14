@@ -27,11 +27,55 @@ ALGORITHMS = ["tfidf", "bbidf", "textrank"]
 ALGO_LABELS = {"tfidf": "TF-IDF", "bbidf": "BB-IDF", "textrank": "TextRank"}
 
 
+def _measure_per_doc_times(X, docs_tokens, vocab, window):
+    """Per-document scoring time (seconds), one list per algorithm, aligned to
+    document order.
+
+    TextRank is genuinely per-document (co-occurrence graph + PageRank); for
+    TF-IDF and BB-IDF the IDF is global (computed once), so we time the
+    per-document weight row ``X[d] * idf``. The IDF is precomputed outside the
+    timed region, mirroring how the global scoring is actually structured.
+    """
+    n = len(docs_tokens)
+    idf_tf = scorers_module._idf_formula(
+        n, scorers_module._document_frequency(X))
+    idf_bb = scorers_module._idf_formula(
+        n, scorers_module._band_document_frequency(X))
+    times = {"tfidf": [], "bbidf": [], "textrank": []}
+    for d in range(n):
+        t0 = time.perf_counter()
+        X[d].astype(np.float64) * idf_tf
+        times["tfidf"].append(time.perf_counter() - t0)
+        t0 = time.perf_counter()
+        X[d].astype(np.float64) * idf_bb
+        times["bbidf"].append(time.perf_counter() - t0)
+        t0 = time.perf_counter()
+        scorers_module.textrank_weights([docs_tokens[d]], vocab, window=window)
+        times["textrank"].append(time.perf_counter() - t0)
+    return times
+
+
+def _write_topk_csv(kw_df: pl.DataFrame, path: Path, k: int) -> None:
+    """Dedicated tabular export of the top-K keywords (documento, algoritmo,
+    rank, keyword, score) so results can be re-analyzed without re-running."""
+    sub = kw_df.filter(pl.col("rank") <= k).select([
+        pl.col("doc").alias("documento"),
+        pl.col("algorithm").alias("algoritmo"),
+        pl.col("rank"),
+        pl.col("term").alias("keyword"),
+        pl.col("score"),
+        pl.col("score_raw"),
+        pl.col("in_gold"),
+    ])
+    sub.write_csv(path)
+
+
 def run_experiment(corpus_dir: str | Path = "data/corpus",
                    output_dir: str | Path = "results",
                    ks: list[int] = KS,
                    textrank_window: int = 2,
-                   seed: int = 0) -> dict:
+                   seed: int = 0,
+                   n_reps: int = 10) -> dict:
     output_dir = Path(output_dir)
     for sub in ["raw", "processed", "metrics", "statistical", "figures", "tables"]:
         (output_dir / sub).mkdir(parents=True, exist_ok=True)
@@ -59,7 +103,7 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
     n_docs = len(docs_tokens)
     n_gold_docs = n_docs - len(excluded)
 
-    # ---- Scorers (timed, without tracemalloc overhead) ----
+    # ---- Scorers ----
     def _compute(name):
         if name == "textrank":
             return scorers_module.textrank_weights(
@@ -68,24 +112,50 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
             return scorers_module.bbidf_weights(X)
         return scorers_module.tfidf_weights(X)
 
+    # ---- Timing (repeated, mean ± std) + weights (single final run) ----
     weights = {}
-    times = {}
-    matrix_mem = {}
+    times = {name: [] for name in ALGORITHMS}
     for name in ALGORITHMS:
-        t = time.perf_counter()
-        W = _compute(name)
-        times[name] = time.perf_counter() - t
-        matrix_mem[name] = W.nbytes / 1024.0  # KB
-        weights[name] = W
+        for _ in range(n_reps):
+            t = time.perf_counter()
+            _compute(name)
+            times[name].append(time.perf_counter() - t)
+        weights[name] = _compute(name)
 
-    # ---- Peak memory (separate pass, tracemalloc) ----
-    peak_mem = {}
+    time_summary = {
+        name: {
+            "mean": float(np.mean(v)),
+            "median": float(np.median(v)),
+            "std": float(np.std(v, ddof=1)) if len(v) > 1 else 0.0,
+            "min": float(np.min(v)),
+            "max": float(np.max(v)),
+        }
+        for name, v in times.items()
+    }
+
+    # ---- Peak memory (repeated, tracemalloc) ----
+    peak_mem = {name: [] for name in ALGORITHMS}
     for name in ALGORITHMS:
-        tracemalloc.start()
-        _compute(name)
-        _, peak = tracemalloc.get_traced_memory()
-        tracemalloc.stop()
-        peak_mem[name] = peak / 1024.0  # KB
+        for _ in range(n_reps):
+            tracemalloc.start()
+            _compute(name)
+            _, peak = tracemalloc.get_traced_memory()
+            tracemalloc.stop()
+            peak_mem[name].append(peak / 1024.0)  # KB
+    peak_mem_summary = {
+        name: {
+            "mean": float(np.mean(v)),
+            "std": float(np.std(v, ddof=1)) if len(v) > 1 else 0.0,
+        }
+        for name, v in peak_mem.items()
+    }
+
+    # ---- Final weight matrix size (informative; identical by construction) ----
+    weight_matrix_kb = {name: weights[name].nbytes / 1024.0
+                        for name in ALGORITHMS}
+
+    # ---- Per-document scoring time (for per_document export) ----
+    per_doc_times = _measure_per_doc_times(X, docs_tokens, vocab, textrank_window)
 
     # ---- Per-document metrics ----
     vidx = {t: i for i, t in enumerate(vocab)}
@@ -126,6 +196,9 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
 
     kw_df = pl.DataFrame(keyword_rows)
     kw_df.write_csv(output_dir / "metrics" / "keywords_ranked.csv")
+
+    _write_topk_csv(kw_df, output_dir / "metrics" / "top5_keywords.csv", 5)
+    _write_topk_csv(kw_df, output_dir / "metrics" / "top50_keywords.csv", 50)
 
     pl.DataFrame(doc_rows).write_csv(output_dir / "raw" / "doc_info.csv")
 
@@ -254,6 +327,18 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
                 "ci_low": ci["ci_low"], "ci_high": ci["ci_high"],
             })
     stat_df = pl.DataFrame(stat_rows)
+    # Holm-Bonferroni correction over the primary comparison family
+    # (bbidf vs tfidf, all metrics). The bbidf_vs_textrank rows are secondary
+    # and left uncorrected (reported for context).
+    primary_idx = [i for i, r in enumerate(stat_rows)
+                   if r["comparison"] == "bbidf_vs_tfidf"]
+    p_holm = [np.nan] * len(stat_rows)
+    if primary_idx:
+        raw_p = [stat_rows[i]["p_value"] for i in primary_idx]
+        adj = stats_module.holm_bonferroni(raw_p)
+        for i, v in zip(primary_idx, adj):
+            p_holm[i] = float(v)
+    stat_df = stat_df.with_columns(pl.Series("p_holm", p_holm))
     stat_df.write_csv(output_dir / "statistical" / "paired_tests.csv")
 
     # ---- TextRank gap ----
@@ -284,17 +369,25 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
         "ks": ks,
         "textrank_window": textrank_window,
         "algorithms": ALGORITHMS,
+        "primary_outcome": "F1@10 (BB-IDF vs TF-IDF)",
+        "multiple_comparison_correction": "Holm-Bonferroni over the bbidf_vs_tfidf metric family",
         "preprocessing": "spaCy es_core_news_sm: lemma.lower(); filter punct/space/stop(ES+EN)/like_num/len>=3/lemma.isalpha",
         "idf_formula": "ln((1+N)/(1+df)) + 1",
         "bbidf_band": "mu + 0.5*sigma / mu + 2.5*sigma over nonzero freqs; fallback [1.5,4.5] if band_inf>=band_sup or n_tokens<30",
         "bbidf_change_vs_tfidf": "df -> df_banda only (no hard zeroing of weights)",
         "seed": seed,
+        "n_reps_efficiency": n_reps,
         "prep_time_s": round(t_prep, 4),
-        "fit_time_s": {k: round(v, 4) for k, v in times.items()},
-        "per_doc_time_s": {k: round(v / n_docs, 6) for k, v in times.items()},
-        "throughput_docs_per_s": {k: round(n_docs / v, 2) if v > 0 else None for k, v in times.items()},
-        "peak_memory_kb": {k: round(v, 2) for k, v in peak_mem.items()},
-        "matrix_memory_kb": {k: round(v, 2) for k, v in matrix_mem.items()},
+        "fit_time_s": {k: round(v["mean"], 4) for k, v in time_summary.items()},
+        "fit_time_std_s": {k: round(v["std"], 6) for k, v in time_summary.items()},
+        "fit_time_median_s": {k: round(v["median"], 6) for k, v in time_summary.items()},
+        "fit_time_min_s": {k: round(v["min"], 6) for k, v in time_summary.items()},
+        "fit_time_max_s": {k: round(v["max"], 6) for k, v in time_summary.items()},
+        "per_doc_time_s": {k: round(v["mean"] / n_docs, 6) for k, v in time_summary.items()},
+        "throughput_docs_per_s": {k: round(n_docs / v["mean"], 2) if v["mean"] > 0 else None for k, v in time_summary.items()},
+        "peak_memory_kb": {k: round(v["mean"], 2) for k, v in peak_mem_summary.items()},
+        "peak_memory_std_kb": {k: round(v["std"], 2) for k, v in peak_mem_summary.items()},
+        "weight_matrix_kb": {k: round(v, 2) for k, v in weight_matrix_kb.items()},
     }
     (output_dir / "metadata.json").write_text(
         json.dumps(metadata, indent=2, ensure_ascii=False), encoding="utf-8")
@@ -312,10 +405,21 @@ def run_experiment(corpus_dir: str | Path = "data/corpus",
             })
     pl.DataFrame(top_rows).write_csv(output_dir / "metrics" / "top10_keywords.csv")
 
+    # ---- Per-document scoring times ----
+    pdt_rows = []
+    for d in range(n_docs):
+        if d in excluded:
+            continue
+        for name in ALGORITHMS:
+            pdt_rows.append({"doc_id": d, "algorithm": name,
+                             "time_s": round(per_doc_times[name][d], 9)})
+    pl.DataFrame(pdt_rows).write_csv(output_dir / "raw" / "per_doc_times.csv")
+
     # ---- Per-document folders (top-50 CSV + word clouds per algorithm) ----
     per_doc_module.export_per_document(
         documents, docs_tokens, vocab, weights, gold_sets, excluded,
-        output_dir=output_dir / "per_document", top_n=50)
+        output_dir=output_dir / "per_document", top_n=50, ks=ks,
+        per_doc_times=per_doc_times)
 
     return {
         "metadata": metadata,
@@ -340,10 +444,13 @@ def main():
     ap.add_argument("--window", type=int, default=2,
                     help="TextRank co-occurrence window")
     ap.add_argument("--seed", type=int, default=0)
+    ap.add_argument("--reps", type=int, default=10,
+                    help="Repeticiones para tiempos/memoria (media ± std)")
     args = ap.parse_args()
 
     res = run_experiment(corpus_dir=args.corpus, output_dir=args.out,
-                         ks=args.ks, textrank_window=args.window, seed=args.seed)
+                         ks=args.ks, textrank_window=args.window, seed=args.seed,
+                         n_reps=args.reps)
 
     print("\n=== RESUMEN (media F1@K) ===")
     summ = res["summary"]
